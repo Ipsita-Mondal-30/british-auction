@@ -1,6 +1,4 @@
 node_modules/
-.env
-.env.local
 .env*.local
 !.env.example
 
@@ -18,3 +16,4 @@ __pycache__/
 
 .DS_Store
 .vercel
+config.bat

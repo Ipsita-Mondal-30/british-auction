@@ -5,7 +5,7 @@
 | **Status** | v1 live: Next.js on Vercel, FastAPI + Socket.IO on Render, PostgreSQL on Render |
 | **Scope** | RFQ creation, British (reverse) auction bidding with auto-extension and a forced close, live updates, role-based visibility |
 | **Updated** | 2026-10-23 |
-| **Related** | [Database schema](SCHEMA.md) · [Backend diagram prompt](BACKEND_ARCHITECTURE_PROMPT.md) · API docs at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs) |
+| **Related** | [Database schema](SCHEMA.md) · API docs at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs) |
 
 Every capability below is labelled **Built** (running in v1) or **Planned** (designed, not built), so the document can be read as both a description of the system and its roadmap.
 
@@ -85,7 +85,7 @@ The two pressure points are **writes contending on one auction** and **read fan-
 
 ![Architecture diagram](architecture.png)
 
-Source: [`architecture.svg`](architecture.svg). For the backend internals (FastAPI request pipeline, modules, data access, deploy), see [`BACKEND_ARCHITECTURE_PROMPT.md`](BACKEND_ARCHITECTURE_PROMPT.md).
+Source: [`architecture.svg`](architecture.svg).
 
 ```mermaid
 flowchart LR
