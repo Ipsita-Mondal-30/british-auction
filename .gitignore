@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.local
+.env*.local
+!.env.example
+
+# build output
+backend/dist/
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+.DS_Store
+.vercel
