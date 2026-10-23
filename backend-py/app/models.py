@@ -10,6 +10,8 @@ from sqlalchemy import Date, ForeignKey, Index, Integer, Numeric, Text, TypeDeco
 from sqlalchemy.dialects.postgresql import ENUM, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from .auction import to_cents
+
 
 class UTCDateTime(TypeDecorator):
     """TIMESTAMP(3) without time zone holding UTC, like Prisma's DateTime. Aware datetimes in Python."""
@@ -85,6 +87,11 @@ class Bid(Base):
 
     rfq: Mapped[Rfq] = relationship(back_populates='bids')
     supplier: Mapped[User] = relationship()
+
+    @property
+    def total_cents(self) -> int:
+        """Integer cents, so ranking compares exact amounts (see auction.rank)."""
+        return to_cents(self.total_amount)
 
 
 class AuctionEvent(Base):
