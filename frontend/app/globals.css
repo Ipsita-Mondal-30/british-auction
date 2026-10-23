@@ -1,0 +1,207 @@
+@import "tailwindcss";
+
+/*
+  Tokens. Light, monochrome: off-white page, white surfaces, near-black ink.
+  Black is the only accent; status colours are muted and semantic only.
+  Radius rule: controls (buttons, inputs, pills) 8px, surfaces (panels, tables, toasts) 12px.
+*/
+:root {
+  color-scheme: light;
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f2f2ef;
+  --line: #e6e6e2;
+  --line-strong: #d4d4cf;
+  --fg: #111111;
+  --fg-2: #4b4b4f;
+  --fg-3: #6b6b70;
+  --accent: #111111;
+  --accent-hover: #2b2b2b;
+  --accent-soft: #f0f0ed;
+  --accent-fg: #ffffff;
+  --ok: #15703d;
+  --ok-soft: #ebf6ee;
+  --warn: #9a5800;
+  --warn-soft: #fcf2e1;
+  --danger: #b42318;
+  --danger-soft: #fdeeec;
+  --shadow: 0 1px 2px rgb(17 17 17 / 0.04);
+  --shadow-float: 0 1px 2px rgb(17 17 17 / 0.04), 0 8px 24px -6px rgb(17 17 17 / 0.12);
+  /* Motion curves (plain vars, not theme tokens, so they always reach the CSS output) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --shadow-panel: var(--shadow);
+  --shadow-float: var(--shadow-float);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Press feedback for anything clickable. */
+.press {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Enter animation for notices (no JS mount state needed). */
+.enter {
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Brief highlight when a value changes (e.g. close time extended). */
+@keyframes flash {
+  from {
+    background-color: var(--warn-soft);
+  }
+}
+.flash {
+  animation: flash 1.6s ease-out;
+}
+
+/*
+  Activity icon motion (2D, transform only). A tile carries data-mode:
+    once  plays when an event arrives live or a toast appears
+    loop  the newest event while the auction is live (motion, then a long rest)
+    idle  still; replays on row hover
+  gavel: strikes the table (pivots at the handle end, tile squashes on impact)
+  clock: turns a full revolution          lock: drops shut with a small clunk
+  drop:  nudges down-right (outbid)       pop:  settles in from 0.6 scale (success)
+*/
+/* Tile squashes toward its base on impact, like a block being struck. */
+.ico-tile { transform-origin: 50% 100%; }
+.ico-gavel { transform-origin: 20% 84%; }
+.ico-clock { transform-origin: 50% 50%; }
+.ico-lock { transform-origin: 50% 100%; }
+
+@keyframes gavel-strike {
+  0% { transform: rotate(0deg); }
+  35% { transform: rotate(-26deg); }
+  55% { transform: rotate(12deg); }
+  72% { transform: rotate(-4deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes gavel-strike-loop {
+  0% { transform: rotate(0deg); }
+  8.75% { transform: rotate(-26deg); }
+  13.75% { transform: rotate(12deg); }
+  18% { transform: rotate(-4deg); }
+  25%, 100% { transform: rotate(0deg); }
+}
+@keyframes tile-impact {
+  0%, 52% { transform: scale(1); }
+  58% { transform: scale(0.94, 0.88); }
+  78%, 100% { transform: scale(1); }
+}
+@keyframes tile-impact-loop {
+  0%, 13% { transform: scale(1); }
+  14.5% { transform: scale(0.94, 0.88); }
+  19.5%, 100% { transform: scale(1); }
+}
+@keyframes clock-turn {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes clock-turn-loop {
+  0% { transform: rotate(0deg); }
+  22%, 100% { transform: rotate(360deg); }
+}
+@keyframes lock-clunk {
+  0% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-3px) rotate(-8deg); }
+  55% { transform: translateY(0) rotate(6deg); }
+  75% { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes lock-clunk-loop {
+  0% { transform: translateY(0) rotate(0deg); }
+  6% { transform: translateY(-3px) rotate(-8deg); }
+  11% { transform: translateY(0) rotate(6deg); }
+  15% { transform: rotate(-3deg); }
+  20%, 100% { transform: rotate(0deg); }
+}
+@keyframes icon-drop {
+  0% { transform: translate(0, -3px); }
+  60% { transform: translate(2px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes icon-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.ico-tile[data-mode="once"] .ico-gavel { animation: gavel-strike 650ms var(--ease-in-out) both; }
+.ico-tile[data-mode="once"]:has(.ico-gavel) { animation: tile-impact 650ms var(--ease-out) both; }
+.ico-tile[data-mode="once"] .ico-clock { animation: clock-turn 800ms var(--ease-in-out) both; }
+.ico-tile[data-mode="once"] .ico-lock { animation: lock-clunk 550ms var(--ease-out) both; }
+.ico-tile[data-mode="once"] .ico-drop { animation: icon-drop 450ms var(--ease-out) both; }
+.ico-tile[data-mode="once"] .ico-pop { animation: icon-pop 400ms var(--ease-out) both; }
+
+.ico-tile[data-mode="loop"] .ico-gavel { animation: gavel-strike-loop 2.6s var(--ease-in-out) infinite; }
+.ico-tile[data-mode="loop"]:has(.ico-gavel) { animation: tile-impact-loop 2.6s var(--ease-out) infinite; }
+.ico-tile[data-mode="loop"] .ico-clock { animation: clock-turn-loop 3.6s var(--ease-in-out) infinite; }
+.ico-tile[data-mode="loop"] .ico-lock { animation: lock-clunk-loop 2.75s var(--ease-out) infinite; }
+
+/* Hover replays the motion once (pointer devices only; touch fires false hovers). */
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .ico-tile[data-mode="idle"] .ico-gavel { animation: gavel-strike 650ms var(--ease-in-out) both; }
+  .group:hover .ico-tile[data-mode="idle"]:has(.ico-gavel) { animation: tile-impact 650ms var(--ease-out) both; }
+  .group:hover .ico-tile[data-mode="idle"] .ico-clock { animation: clock-turn 800ms var(--ease-in-out) both; }
+  .group:hover .ico-tile[data-mode="idle"] .ico-lock { animation: lock-clunk 550ms var(--ease-out) both; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Icons are decorative state cues: hold them still. */
+  .ico-tile,
+  .ico-tile * {
+    animation: none !important;
+  }
+  .press:active:not(:disabled) {
+    transform: none;
+  }
+  .enter {
+    transition: opacity 150ms ease;
+    @starting-style {
+      opacity: 0;
+      transform: none;
+    }
+  }
+}
+
