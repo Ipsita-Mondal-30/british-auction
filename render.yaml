@@ -9,16 +9,16 @@ databases:
 services:
   - type: web
     name: british-auction-api
-    runtime: node
-    rootDir: backend
+    runtime: python
+    rootDir: backend-py
     plan: starter
-    buildCommand: npm ci && npx prisma generate && npm run build
+    buildCommand: pip install -r requirements.txt
     # Migrations run at start so this works on every plan (preDeployCommand is paid-only).
-    startCommand: npx prisma migrate deploy && node dist/index.js
+    startCommand: alembic upgrade head && uvicorn app.main:asgi --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: "20"
+      - key: PYTHON_VERSION
+        value: "3.12.15"
       - key: DATABASE_URL
         fromDatabase:
           name: british-auction-db
