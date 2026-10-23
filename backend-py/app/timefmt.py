@@ -8,4 +8,6 @@ def iso(dt: datetime) -> str:
 
 
 def now() -> datetime:
-    return datetime.now(timezone.utc)
+    """Current UTC time at millisecond precision, matching TIMESTAMP(3) and JavaScript dates."""
+    dt = datetime.now(timezone.utc)
+    return dt.replace(microsecond=dt.microsecond // 1000 * 1000)
