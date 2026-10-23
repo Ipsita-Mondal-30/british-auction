@@ -4,7 +4,7 @@
 
 ![Architecture diagram](architecture.png)
 
-Source: [`architecture.svg`](architecture.svg). To regenerate in another tool, use [`ARCHITECTURE_DIAGRAM_PROMPT.md`](ARCHITECTURE_DIAGRAM_PROMPT.md).
+Source: [`architecture.svg`](architecture.svg). For a diagram of the backend internals (FastAPI request pipeline, modules, data access, deploy), use [`BACKEND_ARCHITECTURE_PROMPT.md`](BACKEND_ARCHITECTURE_PROMPT.md).
 
 ```mermaid
 flowchart LR
