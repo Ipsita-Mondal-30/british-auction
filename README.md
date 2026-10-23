@@ -20,6 +20,9 @@ The full design review is in **[docs/HLD.md](docs/HLD.md)**: requirements, capac
 | Duplicates and retries | Own-bid rule rejects repeats that aren't lower | Idempotency keys with a Bloom filter in front of an authoritative Redis check | [§9.2](docs/HLD.md#92-bloom-filters) |
 | Background work | — | Celery on a Redis broker: `close_auction` jobs scheduled at the close (re-scheduled on extension), notifications, outbox relay, nightly success metrics | [§13](docs/HLD.md#13-roadmap-redis-celery-and-beyond) |
 | Security | Mock `x-user-id` auth; role-shaped responses in one place; CORS locked to the frontend | OIDC/JWT, per-org tenancy, Redis token-bucket rate limits | [§11](docs/HLD.md#11-security) |
+| CAP trade-offs | CP for bids and close times (fail rather than diverge); AP for views and live updates (stale-but-safe, resync on reconnect) | Same rules extended to replicas, Redis and Celery | [§9.5](docs/HLD.md#95-cap-theorem-where-each-part-of-the-system-stands) |
+| Load balancing | Render's managed load balancer, one instance | Nginx: `least_conn` for REST, sticky `ip_hash` for Socket.IO, WebSocket upgrade, per-IP rate limits ([config](deploy/nginx/nginx.conf)) | [§9.6](docs/HLD.md#96-load-balancing-with-nginx) |
+| Engineering decisions | Strategy classes per extension trigger; `SELECT ... FOR UPDATE`; status evaluated lazily from the wall clock; PostgreSQL CHECK constraints | — | [§14.1](docs/HLD.md#141-important-engineering-decisions) |
 
 ```mermaid
 flowchart LR

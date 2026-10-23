@@ -17,6 +17,8 @@ Every capability below is labelled **Built** (running in v1) or **Planned** (des
 - **Core design choice:** PostgreSQL is the single source of truth, and **one row lock per auction** serializes bids. The server clock decides; the UI timer is display-only.
 - **Live updates** are pushed over Socket.IO as `{ rfqId }` only. Clients refetch over REST with their own identity, so role-based visibility is enforced in exactly one place.
 - **Status is derived, never stored**, so no scheduler is needed for correctness and nothing breaks on restart.
+- **Extension rules are strategy classes** (one per trigger type), and **PostgreSQL CHECK constraints** back up the API's validation. See [§14.1](#141-important-engineering-decisions).
+- **CAP stance:** consistent (CP) for bids and close times, available (AP) for viewing and live updates ([§9.5](#95-cap-theorem-where-each-part-of-the-system-stands)). **Nginx** is the documented load balancer for scale-out ([§9.6](#96-load-balancing-with-nginx)).
 - **Next step for scale:** add **Redis** (Socket.IO fan-out across instances, caching, leaderboards, rate limits, idempotency with a Bloom filter) and **Celery** (auction-close jobs, notifications, an outbox relay, analytics). See [§13](#13-roadmap-redis-celery-and-beyond).
 
 ---
@@ -138,6 +140,7 @@ erDiagram
 - `Rfq` holds the configuration (X, Y, trigger) and three close times: `bidCloseAt` (original), `currentCloseAt` (moves on extension), `forcedCloseAt` (cap). It is also the **lock target**.
 - `Bid` and `AuctionEvent` are **append-only**: a revised quote is a new row, so the full history and audit trail are kept.
 - Indexes: `Bid(rfqId, supplierId, createdAt)`, `AuctionEvent(rfqId, createdAt)`, unique `Rfq.refId`.
+- **CHECK constraints** enforce timestamp order, the forced-close cap and money invariants in the database itself ([§14.1](#141-important-engineering-decisions)).
 
 Full detail: [SCHEMA.md](SCHEMA.md).
 
@@ -231,7 +234,7 @@ Shaping happens in one function (`details()` in `backend-py/app/routes.py`), and
 
 ---
 
-## 9. Scalability deep dive
+## 9. Scalability and distributed-systems deep dive
 
 ### 9.1 Hot keys and hot auctions
 
@@ -301,11 +304,69 @@ The write path never reads from cache: the bid transaction always reads Postgres
 
 | Concern | Approach | Status |
 |---|---|---|
-| More API instances | Stateless FastAPI behind Render's load balancer; sticky sessions not required | Ready |
+| More API instances | Stateless FastAPI behind a load balancer (Render's today, Nginx when self-hosted, [§9.6](#96-load-balancing-with-nginx)); REST needs no stickiness, Socket.IO long-polling does | Ready |
 | Broadcasts across instances | `socketio.AsyncRedisManager` (Redis pub/sub) so an emit on one instance reaches sockets on all | Planned |
 | Read load | Postgres read replica for listings and history; writes stay on the primary | Planned |
 | Event table growth | Partition `AuctionEvent` and `Bid` by month; archive closed auctions older than 12 months to object storage | Planned |
 | Connection limits | PgBouncer in transaction mode in front of Postgres | Planned |
+
+### 9.5 CAP theorem: where each part of the system stands
+
+**CAP** says that when a network **partition** splits a distributed system, each operation must choose between **consistency** (every read sees the latest write, or the request fails) and **availability** (every request gets an answer, possibly stale). Partitions can't be ruled out between browsers, API instances, Redis and the database, so the real choice is C or A, made per operation. **PACELC** adds the everyday case: *Else*, with no partition, the trade-off is **latency** versus **consistency**.
+
+This system does not pick one letter globally. It is **CP for money and time** and **AP for viewing and notifications**:
+
+| Path | Choice | During a partition | With no partition (PACELC) | Why |
+|---|---|---|---|---|
+| Placing a bid; moving the close | **CP** | If the API can't reach the Postgres primary, the bid fails with an error. It is never accepted on a replica, a cache or a queue to "sync later". | Consistency over latency: one synchronous transaction on the single primary, under the row lock | Accepting a bid on both sides of a split could produce two L1s, a bid after the close, or an extension past the forced close |
+| Creating an RFQ | **CP** | Fails rather than risk a duplicate reference ID | Unique index checked in the transaction | Reference IDs must be unique |
+| Auction status | **CP** (derived from committed times + server clock) | Unavailable if the database is | Computed on read | Status can't drift from the times that define it |
+| Viewing listings and details | **AP** (Planned: replica + cache) | Serve the last known snapshot (≤ 1–2 s old) with its `serverNow`; any bid is still re-checked on the primary | Latency over consistency: cache and replica reads | A slightly stale view is harmless because the write path is authoritative |
+| Live updates (Socket.IO) | **AP**, eventually consistent | Pushes can be missed; clients rejoin and refetch on reconnect | Fire-and-forget push of `{ rfqId }` | The push is a hint to refetch, not the data |
+| Redis (cache, leaderboard, rate limits) | **AP** (Planned) | Bypass the cache and read Postgres; rate limiting fails open for reads and closed for bids | In-memory, single-digit ms | Redis is never the source of truth |
+| Celery jobs (Planned) | At-least-once, idempotent | Jobs retry after the partition heals; stale `close_auction` jobs exit | Asynchronous | Side effects (emails, results) can lag; correctness can't |
+
+```mermaid
+flowchart TD
+    Req["Request during a network partition"] --> Kind{"Changes money or time?<br/>(bid, extension, new RFQ)"}
+    Kind -- yes --> Primary{"Postgres primary reachable?"}
+    Primary -- yes --> Commit["Commit under the row lock (C)"]
+    Primary -- no --> Fail["Fail with an error<br/>never accept 'to sync later' (C over A)"]
+    Kind -- "no (read, push, notify)" --> Fresh{"Primary reachable?"}
+    Fresh -- yes --> Read["Read latest"]
+    Fresh -- no --> Stale["Serve cached snapshot with serverNow (A over C)<br/>clients resync when the partition heals"]
+```
+
+**In v1** there is one API instance and one database node, so the partitions that can happen are browser ↔ API and API ↔ database. Both already behave as above: bids fail closed, and clients resync after reconnecting. The table shows how the same rules extend to replicas, Redis and Celery as they are added.
+
+### 9.6 Load balancing with Nginx
+
+**Today:** one API instance behind Render's managed load balancer, with Cloudflare in front for TLS. **When scaling out or self-hosting:** Nginx as the layer-7 load balancer in front of N Uvicorn instances. A ready-to-use config is in [`deploy/nginx/nginx.conf`](../deploy/nginx/nginx.conf) (Planned; parsed and structure-checked, not yet serving traffic).
+
+```mermaid
+flowchart LR
+    C["Browsers"] -- "HTTPS / WSS" --> NG["Nginx<br/>TLS, rate limits,<br/>WebSocket upgrade"]
+    NG -- "/api/* least_conn" --> U1 & U2 & U3
+    NG -- "/socket.io/* ip_hash (sticky)" --> U1 & U2 & U3
+    subgraph Instances["Uvicorn instances (FastAPI + Socket.IO)"]
+        U1["api1"]
+        U2["api2"]
+        U3["api3"]
+    end
+    U1 & U2 & U3 <--> R[("Redis pub/sub<br/>Socket.IO adapter")]
+    U1 & U2 & U3 --> PG[("PostgreSQL primary")]
+```
+
+| Concern | Choice in `nginx.conf` | Why |
+|---|---|---|
+| REST balancing | `upstream api_rest { least_conn; }` with keep-alive | Requests are stateless; send each to the least busy instance |
+| Socket.IO balancing | `upstream api_ws { ip_hash; }` (sticky) | The long-polling handshake and fallback must reach the same instance |
+| Cross-instance broadcasts | Redis adapter in the app ([§9.4](#94-scaling-out)) | Stickiness keeps one client on one instance; Redis carries broadcasts between instances |
+| WebSockets | `Upgrade` / `Connection` headers via a `map`, 1 h read timeout, no buffering | Long-lived connections through the proxy |
+| Rate limiting | `limit_req` 5 req/s per IP on `POST /api/rfqs/{id}/bids` (burst 10), 50 req/s elsewhere; returns 429 | Protects the locked write path from floods |
+| Failover | `max_fails=3 fail_timeout=10s`; `proxy_next_upstream` for REST on errors and 502/503 | A failed instance is skipped automatically |
+| TLS and headers | Terminates TLS (HTTP/2); forwards `X-Forwarded-For` / `-Proto`; Uvicorn runs with `--proxy-headers` | Real client IPs for logs and limits |
+| Health | `/api/health` exempt from limits and access logs | Platform and monitoring probes |
 
 ---
 
@@ -330,7 +391,7 @@ Targets: API availability 99.9%; RPO ≤ 5 min, RTO ≤ 30 min (with PITR).
 |---|---|---|
 | Authentication | Mock: `x-user-id` header (documented as an API key in Swagger) | OIDC / JWT; the `current_user` dependency is the single swap point |
 | Authorization | Role checks per endpoint; responses shaped by role in one function | Per-organisation tenancy; buyers see only their own RFQs |
-| Input | Strict validation with field-level errors; JSON only; money handled as integer paise | — |
+| Input | Strict validation with field-level errors; JSON only; money handled as integer paise; PostgreSQL CHECK constraints as a second line | — |
 | Transport and origin | HTTPS; CORS and Socket.IO limited to the Vercel origin | — |
 | Abuse | — | Rate limits in Redis (token bucket per user and per IP; stricter on `POST /bids`) |
 | Audit | Append-only `Bid` and `AuctionEvent` | Signed export of the activity log for disputes |
@@ -464,6 +525,29 @@ flowchart LR
 
 ## 14. Key decisions
 
+### 14.1 Important engineering decisions
+
+**1. Strategy pattern for extension rules (Built).**
+*Decision:* each extension trigger is a class implementing `BaseExtensionStrategy`: `BidReceivedStrategy`, `AnyRankChangeStrategy` and `L1RankChangeStrategy` (`backend-py/app/auction.py`). A registry maps each trigger type to its strategy, and the bid engine calls `STRATEGIES[rfq.trigger_type].detect(before, after)`.
+*Rationale:* each rule is small, pure and unit-tested on its own. Adding a condition (say, "L1 dropped by more than 10%") means adding one class and registering it; the bid transaction doesn't change. An import-time check fails fast if a trigger type has no strategy.
+*Verified:* the refactor is behaviour-identical to the previous `if`/`else` version across 3,000 random scenarios; a test shows a new strategy plugging in without engine changes.
+
+**2. Row-level locking with `SELECT ... FOR UPDATE` (Built).**
+*Decision:* a bid takes an exclusive lock on its RFQ row inside the transaction before reading the ranking or close time.
+*Rationale:* in the final seconds many suppliers bid at once. Without the lock, two bids could both read the old close time and both extend from it (one extension lost), or both see the same ranking. The lock is per auction, so different auctions never contend, and it is held for milliseconds.
+*Verified:* four identical simultaneous bids from one supplier produce exactly one acceptance and one clean extension chain.
+
+**3. Wall-clock lazy state evaluation (Built).**
+*Decision:* auction status (Upcoming, Active, Closed, Force Closed) is computed on every read by comparing the current UTC time with `bidStartAt`, `currentCloseAt` and `forcedCloseAt`. It is never stored.
+*Rationale:* no scheduler has to flip dormant auctions at the right second, nothing can go stale, and a restart loses nothing. Every request reflects the true temporal state. Side effects at close (awarding, emails) are the only reason a job is planned ([§13.3](#133-celery-tasks-planned)).
+
+**4. Database-level CHECK constraints (Built).**
+*Decision:* timestamp order and money invariants are enforced by PostgreSQL CHECK constraints (Alembic migration `0002`), in addition to API validation: close after start, forced close after close, the current close between the original close and the forced close (the cap), X and Y within 1–1440, non-negative charges, total equal to the sum of the charges, positive totals, transit 1–365 days, non-blank names, and extensions always moving the close later.
+*Rationale:* defence in depth. No write path (a script, a manual fix, a future service or worker) can store an invalid auction or bid, whatever validates or doesn't upstream.
+*Verified:* each constraint rejects a violating row; existing production data (24 RFQs, 58 bids, 77 events) satisfies all of them; the full rule suite passes with the constraints on. Full list: [SCHEMA.md](SCHEMA.md#check-constraints).
+
+### 14.2 Decision log
+
 | Decision | Chosen | Alternatives considered | Why |
 |---|---|---|---|
 | Concurrency control | Pessimistic row lock per RFQ | Optimistic version column with retries; Redis lock | Contention is per auction and short; a lock gives exactly-once extension logic with no retry storms. Revisit with per-auction partitions if lock wait grows. |
@@ -474,6 +558,10 @@ flowchart LR
 | Bid rule | Must beat own previous bid | Must beat L1 | Keeps L2/L3 meaningful and the three trigger types distinct. |
 | Extension base | Current close + Y | Bid time + Y | Matches the brief's example (6:00 → 6:05). |
 | Backend stack | FastAPI + SQLAlchemy + Alembic | Node/Express + Prisma (v0) | Migrated with identical API contracts, verified response-for-response. |
+| Extension rules | Strategy classes + registry | `if`/`else` per trigger in one function | Open for extension without touching the bid engine; each rule tested alone. |
+| Data integrity | API validation **and** DB CHECK constraints | API validation only | Defence in depth against any other write path. |
+| Partition behaviour | CP for bids and close times, AP for views and pushes ([§9.5](#95-cap-theorem-where-each-part-of-the-system-stands)) | One global choice | Money and time must never diverge; a stale view is harmless. |
+| Load balancing | Render LB today; Nginx (least_conn REST, sticky Socket.IO) when self-hosting | Single instance only | Horizontal scale with correct WebSocket handling ([§9.6](#96-load-balancing-with-nginx)). |
 
 ---
 
@@ -497,3 +585,6 @@ flowchart LR
 | Hot key | A single key (row, cache entry, room) receiving a disproportionate share of traffic |
 | Bloom filter | Probabilistic set: "definitely not present" or "maybe present", in fixed memory |
 | Outbox | Events written in the same transaction as the data, published afterwards by a relay |
+| CAP / PACELC | Under a partition choose consistency or availability; else choose latency or consistency |
+| Sticky session | A load balancer sending one client's requests to the same instance (needed for Socket.IO long-polling) |
+| Strategy pattern | Interchangeable classes behind one interface, chosen at runtime (here: one per extension trigger) |

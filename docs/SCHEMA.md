@@ -84,6 +84,24 @@ Append-only activity log behind the "Activity" panel.
 - `EXTENSION_CAPPED`: a trigger fired, but the auction was already at its forced close.
 - `reason` is written for the buyer. Suppliers get a redacted version generated at read time, so competitor names never leave the server.
 
+## CHECK constraints
+
+Added by Alembic migration `0002`. The API validates the same rules first; the database enforces them for every write path.
+
+| Table | Constraint | Rule |
+|---|---|---|
+| `Rfq` | `rfq_close_after_start` | `bidCloseAt > bidStartAt` |
+| `Rfq` | `rfq_forced_after_close` | `forcedCloseAt > bidCloseAt` |
+| `Rfq` | `rfq_current_close_within_cap` | `bidCloseAt <= currentCloseAt <= forcedCloseAt` (extensions never pass the forced close) |
+| `Rfq` | `rfq_trigger_window_range`, `rfq_extension_range` | X and Y between 1 and 1440 minutes |
+| `Rfq` | `rfq_ref_id_not_blank`, `rfq_name_not_blank` | Not empty after trimming |
+| `Bid` | `bid_charges_non_negative` | Freight, origin and destination charges ≥ 0 |
+| `Bid` | `bid_total_is_sum_of_charges` | `totalAmount = freight + origin + destination` |
+| `Bid` | `bid_total_positive` | `totalAmount > 0` |
+| `Bid` | `bid_transit_range` | Transit time between 1 and 365 days |
+| `Bid` | `bid_carrier_not_blank` | Not empty after trimming |
+| `AuctionEvent` | `event_extension_moves_close_later` | A `TIME_EXTENDED` event has both close times and `newCloseAt > oldCloseAt` |
+
 ## Design decisions
 
 | Decision | Why |
@@ -94,3 +112,4 @@ Append-only activity log behind the "Activity" panel.
 | Index `Bid(rfqId, supplierId, createdAt)` | Loading an RFQ's bids, and "latest bid per supplier". |
 | Index `AuctionEvent(rfqId, createdAt)` | Activity log in time order. |
 | Unique `Rfq.refId` | Human reference IDs must not collide. Duplicates return a 409 shown inline on the form. |
+| CHECK constraints | Defence in depth: invalid timestamps or money can't be stored even by a write path that skips the API. |
