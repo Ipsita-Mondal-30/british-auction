@@ -1,6 +1,5 @@
-"""Initial schema, identical to the Prisma migration 20261022190031_init.
-
-A database Prisma already created gets `alembic stamp 0001` instead of running this.
+"""Initial schema. It reproduces the original Prisma migration (20261022190031_init) exactly, so a
+database created by the earlier Node/Prisma version of the API gets `alembic stamp 0001` instead.
 
 Revision ID: 0001
 Revises:

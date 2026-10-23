@@ -11,5 +11,5 @@ app.add_middleware(CORSMiddleware, allow_origins=config.FRONTEND_ORIGINS, allow_
 errors.register(app)
 app.include_router(router)
 
-# Socket.IO answers on /socket.io/ (same path as the Node server); everything else goes to FastAPI.
+# Socket.IO answers on /socket.io/ (the path socket.io-client expects); everything else goes to FastAPI.
 asgi = socketio.ASGIApp(sio, other_asgi_app=app)

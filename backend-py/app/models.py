@@ -1,6 +1,6 @@
 """
-SQLAlchemy models for the tables the Prisma schema created. Names, types and constraints match
-exactly, so both backends can share one database.
+SQLAlchemy models. Table and column names are camelCase because the original Node/Prisma version of
+the API created the schema; keeping it unchanged means existing databases need no data migration.
 """
 
 from datetime import date, datetime, timezone
@@ -14,7 +14,7 @@ from .auction import to_cents
 
 
 class UTCDateTime(TypeDecorator):
-    """TIMESTAMP(3) without time zone holding UTC, like Prisma's DateTime. Aware datetimes in Python."""
+    """TIMESTAMP(3) without time zone, holding UTC. Aware datetimes in Python."""
 
     impl = TIMESTAMP(precision=3)
     cache_ok = True

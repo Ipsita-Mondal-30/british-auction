@@ -18,9 +18,9 @@ flowchart LR
     end
 
     subgraph Render
-        API[Express REST API<br/>/api/*]
+        API[FastAPI REST API<br/>/api/*]
         WS[Socket.IO server<br/>rooms: list, rfq:id]
-        DOM[auction.ts<br/>pure domain rules]
+        DOM[auction.py<br/>pure domain rules]
         DB[(PostgreSQL)]
     end
 
@@ -28,19 +28,19 @@ flowchart LR
     B & S -- REST: GET data, POST bids --> API
     WS -. "rfq:updated {rfqId}" .-> B & S
     API --> DOM
-    API -- Prisma, row lock per RFQ --> DB
+    API -- SQLAlchemy, row lock per RFQ --> DB
     API -- emit after commit --> WS
 ```
 
 | Component | Responsibility |
 |---|---|
 | **Next.js (Vercel)** | UI only. Pages are client components that call the API, keep a server-synced clock and listen on Socket.IO. |
-| **Express API (Render)** | Validation (zod), mock auth, role-shaped responses and the bid transaction. The only thing that decides whether a bid counts. |
-| **`auction.ts`** | Pure functions: ranking, trigger detection, extension math, status. No DB and no clock, so they are unit-tested in isolation. |
+| **FastAPI API (Render)** | Validation, mock auth, role-shaped responses and the bid transaction. The only thing that decides whether a bid counts. Runs on Uvicorn with python-socketio mounted alongside. |
+| **`auction.py`** | Pure functions: ranking, trigger detection, extension math, status. No DB and no clock, so they are unit-tested in isolation. |
 | **Socket.IO** | Push channel. Broadcasts carry **only the RFQ id**. Clients refetch over REST with their own identity, so a supplier can never receive competitor data through a broadcast. |
 | **PostgreSQL** | Source of truth. One row lock per RFQ serializes bids. |
 
-Why Render for the API: Vercel functions are serverless and can't hold a WebSocket open. Render runs a long-lived Node process.
+Why Render for the API: Vercel functions are serverless and can't hold a WebSocket open. Render runs a long-lived Python (Uvicorn) process.
 
 ## 2. Bid placement (the critical path)
 
@@ -48,13 +48,13 @@ Why Render for the API: Vercel functions are serverless and can't hold a WebSock
 sequenceDiagram
     autonumber
     participant S as Supplier browser
-    participant API as Express API
+    participant API as FastAPI
     participant DB as Postgres
     participant IO as Socket.IO
     participant O as Other browsers
 
     S->>API: POST /api/rfqs/:id/bids (x-user-id)
-    Note over API: now = arrival time<br/>validate body (zod)
+    Note over API: now = arrival time<br/>validate body
     API->>DB: BEGIN
     API->>DB: SELECT ... FROM "Rfq" WHERE id = :id FOR UPDATE
     Note over API,DB: concurrent bids on this RFQ wait here
@@ -123,11 +123,11 @@ Both work by diffing fresh REST data against what the client saw last, so they i
 | Own quotes and own rank | n/a | Yes |
 | Activity log | Full, with names | Own bids in full. Competitor bids appear as "A competitor placed a bid". Extensions show the trigger type only. |
 
-Shaping happens in one place (`details()` in `backend/src/routes.ts`), and broadcasts carry no data, so there's no second path that could leak.
+Shaping happens in one place (`details()` in `backend-py/app/routes.py`), and broadcasts carry no data, so there's no second path that could leak.
 
 ## 7. Assumptions and edge-case decisions
 
-- **Auth is mocked**: you pick a seeded user and the client sends `x-user-id`. Real auth (sessions or JWT) would replace one middleware.
+- **Auth is mocked**: you pick a seeded user and the client sends `x-user-id`. Real auth (sessions or JWT) would replace one FastAPI dependency.
 - **Currency is INR**. Charges are stored as `Decimal(12,2)` and compared as integer paise to avoid float drift.
 - **Total price** = freight + origin + destination charges. Ranking uses the total.
 - Pickup date must be on or after the forced close date. Quote validity can't be in the past.

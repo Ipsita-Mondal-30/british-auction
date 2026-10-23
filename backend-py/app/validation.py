@@ -1,7 +1,7 @@
 """
-Request validation with the same rules, messages and issue order as the Node API's zod schemas,
-so the frontend shows identical field errors. An issue marked `abort` (wrong type, unparseable
-date, unknown option, non-integer) skips the cross-field date checks, as zod does.
+Request validation. Messages and issue order are part of the API contract: the frontend shows each
+issue next to its field. An issue marked `abort` (wrong type, unparseable date, unknown option,
+non-integer) skips the cross-field date checks.
 """
 
 import json
@@ -60,11 +60,11 @@ class Issues:
             raise HttpError(400, issues[0]['message'], issues)
 
 
-# --- request body (express.json semantics) ---------------------------------------------------
+# --- request body ----------------------------------------------------------------------------
 
 async def json_body(request: Request) -> Any:
     """
-    The parsed JSON body, or MISSING when there is none. Like express.json(), only objects and
+    The parsed JSON body, or MISSING when there is none (not JSON, or empty). Only objects and
     arrays are accepted at the top level, and anything unparseable is 'Invalid JSON body'.
     """
     content_type = request.headers.get('content-type', '').split(';')[0].strip().lower()

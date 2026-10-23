@@ -22,7 +22,7 @@
 
   <!-- Title -->
   <text x="40" y="50" class="t" font-size="24" font-weight="700">British Auction RFQ System: Architecture</text>
-  <text x="40" y="76" class="m" font-size="13">Next.js on Vercel, Express + Socket.IO on Render, PostgreSQL. Live reverse-auction bidding with auto-extension and a forced close.</text>
+  <text x="40" y="76" class="m" font-size="13">Next.js on Vercel, FastAPI + Socket.IO on Render, PostgreSQL. Live reverse-auction bidding with auto-extension and a forced close.</text>
 
   <!-- Zones -->
   <rect x="40" y="100" width="250" height="600" rx="16" class="zone"/>
@@ -35,7 +35,7 @@
 
   <rect x="760" y="100" width="460" height="600" rx="16" class="zone"/>
   <text x="780" y="132" class="zt">Render: API service</text>
-  <text x="780" y="152" class="zs">Node 20, Express 5, TypeScript, long-lived process</text>
+  <text x="780" y="152" class="zs">Python 3.12, FastAPI, Uvicorn, long-lived process</text>
 
   <rect x="1280" y="100" width="280" height="600" rx="16" class="zone"/>
   <text x="1300" y="132" class="zt">Render: database</text>
@@ -81,17 +81,17 @@
 
   <!-- API: REST -->
   <rect x="785" y="175" width="410" height="170" rx="12" fill="#111111"/>
-  <text x="805" y="210" fill="#ffffff" font-size="16" font-weight="700">Express REST API  /api</text>
+  <text x="805" y="210" fill="#ffffff" font-size="16" font-weight="700">FastAPI REST API  /api</text>
   <text x="805" y="240" fill="#d4d4cf" font-size="12.5">Mock auth via x-user-id header</text>
-  <text x="805" y="261" fill="#d4d4cf" font-size="12.5">zod validation on every write</text>
+  <text x="805" y="261" fill="#d4d4cf" font-size="12.5">Validation on every write</text>
   <text x="805" y="282" fill="#d4d4cf" font-size="12.5">Role-shaped responses (buyer vs supplier)</text>
   <text x="805" y="303" fill="#d4d4cf" font-size="12.5">Bid transaction under a per-RFQ row lock</text>
 
   <!-- API: domain -->
   <rect x="785" y="375" width="280" height="120" rx="12" class="node"/>
-  <text x="805" y="406" class="t" font-size="14" font-weight="700">auction.ts (pure rules)</text>
-  <text x="805" y="431" class="m" font-size="12">rank(), detectTrigger(),</text>
-  <text x="805" y="449" class="m" font-size="12">extendClose(), status()</text>
+  <text x="805" y="406" class="t" font-size="14" font-weight="700">auction.py (pure rules)</text>
+  <text x="805" y="431" class="m" font-size="12">rank(), detect_trigger(),</text>
+  <text x="805" y="449" class="m" font-size="12">extend_close(), status()</text>
   <text x="805" y="476" class="s" font-size="11.5">No DB, no clock, unit-tested</text>
 
   <!-- API: Socket.IO -->
@@ -105,7 +105,7 @@
   <path d="M1305,200 V650 A115,16 0 0,0 1535,650 V200" class="node"/>
   <ellipse cx="1420" cy="200" rx="115" ry="16" class="node"/>
   <text x="1420" y="250" class="t" font-size="16" font-weight="700" text-anchor="middle">PostgreSQL</text>
-  <text x="1420" y="270" class="s" font-size="12" text-anchor="middle">Prisma ORM, migrations</text>
+  <text x="1420" y="270" class="s" font-size="12" text-anchor="middle">SQLAlchemy, Alembic migrations</text>
 
   <rect x="1325" y="295" width="190" height="58" rx="8" class="inner"/>
   <text x="1340" y="319" class="t" font-size="13" font-weight="700">User</text>
@@ -145,7 +145,7 @@
   <text x="1120" y="446" class="lbl">commit</text>
 
   <line x1="1197" y1="240" x2="1303" y2="240" class="edge" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="1250" y="228" class="lbl" text-anchor="middle">Prisma tx</text>
+  <text x="1250" y="228" class="lbl" text-anchor="middle">transaction</text>
   <text x="1250" y="260" class="lbl" text-anchor="middle">row lock</text>
 
   <!-- Bid placement flow -->

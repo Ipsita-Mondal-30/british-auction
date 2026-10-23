@@ -22,7 +22,7 @@ from .validation import DAY, bid_input, json_body, rfq_input
 
 router = APIRouter(prefix='/api')
 Db = Annotated[AsyncSession, Depends(get_session)]
-# Declared before the user, so a malformed body is rejected first, as express.json() does.
+# Declared before the user, so a malformed body is rejected before auth is checked.
 Body = Annotated[Any, Depends(json_body)]
 
 TRIGGER_LABEL = {

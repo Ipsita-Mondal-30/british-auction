@@ -1,6 +1,6 @@
 """
-Rows to JSON in exactly the shape the Node API (Prisma) produces: camelCase keys, timestamps
-as JavaScript ISO strings, DATE columns as UTC midnight, money as plain decimal strings.
+Rows to JSON in the shape the frontend expects: camelCase keys, timestamps as JavaScript ISO
+strings, DATE columns as UTC midnight, money as plain decimal strings.
 """
 
 from datetime import date, datetime
@@ -15,12 +15,12 @@ def ts(dt: datetime | None) -> str | None:
 
 
 def day(d: date) -> str:
-    """Prisma returns DATE columns as a timestamp at UTC midnight."""
+    """DATE columns go out as a timestamp at UTC midnight, the form the frontend parses."""
     return f'{d.isoformat()}T00:00:00.000Z'
 
 
 def money(d: Decimal | None) -> str | None:
-    """Like Prisma's Decimal: no trailing zeros, no exponent ("182000", "69199.89")."""
+    """No trailing zeros, no exponent ("182000", "69199.89")."""
     if d is None:
         return None
     s = format(d.normalize(), 'f')

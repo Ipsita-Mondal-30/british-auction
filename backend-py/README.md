@@ -1,6 +1,6 @@
 # Backend (Python / FastAPI)
 
-FastAPI port of the Node backend in `../backend`. It serves the same REST routes under `/api` and the same Socket.IO events, so the frontend works with either.
+REST API under `/api` and Socket.IO live updates for the British auction RFQ system. Interactive API docs are served at `/docs`.
 
 ## Run locally
 
@@ -9,7 +9,8 @@ cd backend-py
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env          # set DATABASE_URL to your local Postgres
-.venv/bin/python -m app       # http://localhost:4001, auto-reloads
+.venv/bin/alembic upgrade head
+.venv/bin/python -m app       # http://localhost:4000, auto-reloads
 ```
 
 Load the demo data (1 buyer, 4 suppliers, 5 RFQs, times relative to now). It wipes every table, so it refuses a non-local database unless you add `--force`:
@@ -18,16 +19,21 @@ Load the demo data (1 buyer, 4 suppliers, 5 RFQs, times relative to now). It wip
 .venv/bin/python -m app.seed
 ```
 
-To point the frontend at it, set `NEXT_PUBLIC_API_URL=http://localhost:4001` in `frontend/.env.local` and add the frontend's origin to `FRONTEND_ORIGIN` here.
+If the frontend runs on a port other than 3000, add its origin to `FRONTEND_ORIGIN` in `.env` (comma-separated).
 
 ## Database migrations
 
-Alembic manages the schema. Its first migration, `0001`, creates exactly the tables the Prisma migration created, so both backends share one database.
+Alembic manages the schema. Migration `0001` creates the four tables.
 
 ```bash
 .venv/bin/alembic upgrade head    # empty database: create the tables
-.venv/bin/alembic stamp 0001      # database Prisma already set up: record it as migrated, change nothing
 .venv/bin/alembic check           # confirm app/models.py matches the database
+```
+
+A database created by the earlier Node/Prisma version of this API already has the tables. Record it as migrated once instead (this changes no data):
+
+```bash
+.venv/bin/alembic stamp 0001
 ```
 
 ## Tests
@@ -37,30 +43,21 @@ Alembic manages the schema. Its first migration, `0001`, creates exactly the tab
 .venv/bin/pytest
 ```
 
-## Parity with the Node backend
-
-With both backends running against the same freshly seeded database, this sends identical requests to each and reports any difference in status code or JSON, key order included: every read for every user, about 70 rejected writes, and five scripted auctions covering each trigger type and the forced-close cap. It adds test RFQs, so reseed afterwards.
-
-```bash
-.venv/bin/python scripts/compare_backends.py --node http://localhost:4000/api --python http://localhost:4001/api
-```
-
 ## Layout
 
 | Path | |
 |---|---|
 | `app/main.py` | FastAPI app, CORS, mounts Socket.IO |
 | `app/realtime.py` | Socket.IO rooms (`list`, `rfq:<id>`) and the `rfq:updated` broadcast |
-| `app/validation.py` | Request validation with the same rules and messages as the Node API |
+| `app/routes.py` | REST routes under `/api`, mock auth (`x-user-id`), buyer and supplier views, bid transaction |
+| `app/validation.py` | Request validation and field error messages |
 | `app/auction.py` | Pure auction rules: ranking, trigger window, triggers, extension cap, status |
-| `app/routes.py` | REST routes under `/api`, mock auth (`x-user-id`), buyer and supplier views |
-| `app/serialize.py` | Rows to JSON in the same shape as the Node API (camelCase, ISO timestamps, money strings) |
+| `app/serialize.py` | Rows to JSON (camelCase, ISO timestamps, money strings) |
 | `app/errors.py` | `{ error, issues? }` error responses |
-| `app/models.py` | SQLAlchemy models for the shared tables (`User`, `Rfq`, `Bid`, `AuctionEvent`) |
+| `app/models.py` | SQLAlchemy models (`User`, `Rfq`, `Bid`, `AuctionEvent`) |
 | `app/db.py` | Async database engine and sessions (asyncpg) |
 | `alembic/` | Schema migrations |
 | `app/seed.py` | Demo data |
 | `app/config.py` | `DATABASE_URL`, `FRONTEND_ORIGIN`, `PORT` from env or `.env` |
-| `app/timefmt.py` | Timestamps in the same format as the Node API |
+| `app/timefmt.py` | Timestamps in JavaScript's ISO format |
 | `tests/` | pytest unit tests for the auction rules |
-| `scripts/compare_backends.py` | Node vs Python parity check |

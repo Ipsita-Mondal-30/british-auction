@@ -1,6 +1,6 @@
 # Database Schema
 
-PostgreSQL, managed with Prisma. Source: [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma). Generated SQL: [`backend/prisma/migrations`](../backend/prisma/migrations).
+PostgreSQL. Models: [`backend-py/app/models.py`](../backend-py/app/models.py) (SQLAlchemy). Migrations: [`backend-py/alembic/versions`](../backend-py/alembic/versions) (Alembic); `0001` creates the schema below.
 
 ```mermaid
 erDiagram
@@ -90,7 +90,7 @@ Append-only activity log behind the "Activity" panel.
 |---|---|
 | **Status is not a column** | It is a pure function of `now`, `bidStartAt`, `currentCloseAt` and `forcedCloseAt`. Storing it would need a scheduler to flip it at the right second and could go stale. |
 | `Decimal(12,2)` for money | Exact values. Comparisons in code use integer paise. |
-| `@db.Date` for pickup/validity | They're calendar dates, not instants. |
+| `DATE` columns for pickup/validity | They're calendar dates, not instants. |
 | Index `Bid(rfqId, supplierId, createdAt)` | Loading an RFQ's bids, and "latest bid per supplier". |
 | Index `AuctionEvent(rfqId, createdAt)` | Activity log in time order. |
 | Unique `Rfq.refId` | Human reference IDs must not collide. Duplicates return a 409 shown inline on the form. |

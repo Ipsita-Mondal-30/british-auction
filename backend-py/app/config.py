@@ -7,4 +7,4 @@ load_dotenv(override=False)
 
 DATABASE_URL = os.getenv('DATABASE_URL', '')
 FRONTEND_ORIGINS = [o.strip() for o in os.getenv('FRONTEND_ORIGIN', 'http://localhost:3000').split(',') if o.strip()]
-PORT = int(os.getenv('PORT', '4001'))
+PORT = int(os.getenv('PORT', '4000'))

@@ -3,7 +3,7 @@
 | Piece | Where | How |
 |---|---|---|
 | PostgreSQL | Render Postgres | Created by the Blueprint (`render.yaml`) |
-| API (Express + Socket.IO) | Render web service | Created by the same Blueprint |
+| API (FastAPI + Socket.IO) | Render web service | Created by the same Blueprint |
 | Frontend (Next.js) | Vercel | Vercel CLI, straight from the `frontend/` folder |
 
 Total time: about 15 minutes.
@@ -14,7 +14,8 @@ Total time: about 15 minutes.
 
 ## 0. Prerequisites
 
-- Node 20+ and npm
+- Python 3.12 (to load the demo data from your machine)
+- Node 20+ and npm (for the Vercel CLI)
 - Accounts on GitHub, Render and Vercel
 - CLIs:
 
@@ -33,7 +34,7 @@ git init && git add -A && git commit -m "British auction RFQ system"
 gh repo create british-auction --private --source . --push   # or create the repo on github.com and push
 ```
 
-`.gitignore` already excludes `node_modules`, build output and `.env` files.
+`.gitignore` already excludes `node_modules`, `.venv`, build output and `.env` files.
 
 ## 2. Create the database and API on Render
 
@@ -50,7 +51,7 @@ Then create it. Either:
 
 When asked for `FRONTEND_ORIGIN`, enter `http://localhost:3000` for now. You'll set the real value in step 5.
 
-Render now creates `british-auction-db` (Postgres) and `british-auction-api`. It runs migrations automatically on start (`prisma migrate deploy` in the start command). Wait for the deploy to go live, then:
+Render now creates `british-auction-db` (Postgres) and `british-auction-api`. It runs migrations automatically on start (`alembic upgrade head` in the start command). Wait for the deploy to go live, then:
 
 ```bash
 render services                     # note the API's URL and service id
@@ -67,9 +68,10 @@ The seed creates 1 buyer, 4 suppliers and 5 RFQs, with times relative to now. It
 In the Render dashboard, open the database and copy the **External Database URL**. Then run:
 
 ```bash
-cd backend
-npm ci
-DATABASE_URL="<External Database URL>" npm run seed -- --force
+cd backend-py
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+DATABASE_URL="<External Database URL>" .venv/bin/python -m app.seed --force
 ```
 
 Re-run it any time to reset the demo clock.
@@ -109,7 +111,7 @@ render deploys create <api-service-id> --wait
 
 ## Using Supabase instead
 
-1. Create a Supabase project. Under Project Settings > Database, copy a connection string that works with Prisma migrations: the **direct connection** (port 5432) or the **session pooler**, not the transaction pooler on port 6543. Append `?sslmode=require`.
+1. Create a Supabase project. Under Project Settings > Database, copy a connection string that works with migrations: the **direct connection** (port 5432) or the **session pooler**, not the transaction pooler on port 6543. Append `?sslmode=require`.
 2. In `render.yaml`, delete the `databases:` block and replace the `DATABASE_URL` entry with:
    ```yaml
    - key: DATABASE_URL
@@ -126,8 +128,9 @@ Supabase's free tier doesn't expire, which makes it the better choice if the dem
 | Browser console shows a CORS error, or the login list never loads | `FRONTEND_ORIGIN` on Render must exactly match the Vercel URL (scheme included, no trailing slash) |
 | Page loads but nothing updates live | Same as above (Socket.IO uses the same origin list), or the free API is waking from sleep; refresh after a minute |
 | Frontend calls `localhost:4000` in production | `NEXT_PUBLIC_API_URL` wasn't set before the build. Add it and run `vercel --prod` again |
-| `npm run seed` says "Refusing to reset a non-local database" | Expected. Add `-- --force` once you're sure the URL is the demo database |
-| Deploy fails at `prisma migrate deploy` | Check `DATABASE_URL`. For Supabase, use the direct or session connection, not port 6543 |
+| The seed says "Refusing to reset a non-local database" | Expected. Add `--force` once you're sure the URL is the demo database |
+| Deploy fails at `alembic upgrade head` | Check `DATABASE_URL`. For Supabase, use the direct or session connection, not port 6543 |
+| Deploy fails with `type "Role" already exists` | The database was set up by the earlier Node/Prisma version of the API. Record it as migrated once, then redeploy: `DATABASE_URL="<External Database URL>" .venv/bin/alembic stamp 0001` (in `backend-py`) |
 | `render` command not found | Install the Render CLI: https://render.com/docs/cli |
 
 ## Sharing as a zip

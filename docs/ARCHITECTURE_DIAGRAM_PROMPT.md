@@ -27,12 +27,12 @@ A finished version drawn from this spec is in [`architecture.png`](architecture.
 > - Live updates: socket.io-client, rooms "list" and "rfq:id"
 > - Notifications: toasts for outbid, new bids and extensions
 >
-> **Zone 3, "Render: API service (Node 20, Express 5, TypeScript)":** three boxes.
-> - "Express REST API /api" (emphasized, dark fill): mock auth via x-user-id, zod validation, role-shaped responses (buyer vs supplier), bid transaction under a per-RFQ row lock.
-> - "auction.ts pure domain rules": rank(), detectTrigger(), extendClose(), status(); no DB, no clock, unit-tested.
+> **Zone 3, "Render: API service (Python 3.12, FastAPI, Uvicorn)":** three boxes.
+> - "FastAPI REST API /api" (emphasized, dark fill): mock auth via x-user-id, request validation, role-shaped responses (buyer vs supplier), bid transaction under a per-RFQ row lock.
+> - "auction.py pure domain rules": rank(), detect_trigger(), extend_close(), status(); no DB, no clock, unit-tested.
 > - "Socket.IO server": rooms "list" and "rfq:<id>"; broadcasts carry only { rfqId }.
 >
-> **Zone 4, "Render: database":** a PostgreSQL cylinder (Prisma ORM) listing four tables:
+> **Zone 4, "Render: database":** a PostgreSQL cylinder (SQLAlchemy models, Alembic migrations) listing four tables:
 > - User (buyer or supplier)
 > - Rfq (times, X, Y, trigger type; the row-lock target)
 > - Bid (append-only quotes)
@@ -41,10 +41,10 @@ A finished version drawn from this spec is in [`architecture.png`](architecture.
 > **Arrows:**
 > 1. Buyer → Next.js app, labelled "HTTPS".
 > 2. Supplier → Next.js app, labelled "HTTPS".
-> 3. Next.js app → Express REST API, labelled "REST / JSON: GET data, POST bids".
-> 4. Express REST API → auction.ts, labelled "uses".
-> 5. Express REST API ↔ PostgreSQL, double-headed, labelled "Prisma transaction, SELECT ... FOR UPDATE".
-> 6. Express REST API → Socket.IO server, labelled "emit after commit".
+> 3. Next.js app → FastAPI REST API, labelled "REST / JSON: GET data, POST bids".
+> 4. FastAPI REST API → auction.py, labelled "uses".
+> 5. FastAPI REST API ↔ PostgreSQL, double-headed, labelled "SQLAlchemy transaction, SELECT ... FOR UPDATE".
+> 6. FastAPI REST API → Socket.IO server, labelled "emit after commit".
 > 7. Socket.IO server → Next.js app, **dashed**, labelled "WebSocket: rfq:updated { rfqId }".
 >
 > **Below the zones**, a horizontal strip titled "Bid placement (critical path)" with 7 numbered steps connected by arrows:
@@ -80,10 +80,10 @@ A finished version drawn from this spec is in [`architecture.png`](architecture.
 | Vercel (inside `web`) | `clock` | Server-synced clock | `offset = serverNow - request midpoint`; countdown is display only |
 | Vercel (inside `web`) | `live` | Live updates | socket.io-client; joins `list` and `rfq:<id>` |
 | Vercel (inside `web`) | `toasts` | Notifications | Sonner toasts: outbid, new bids, extensions, bid placed, closed |
-| Render: API | `api` | Express REST API `/api` | Mock auth, zod validation, role-shaped responses, bid transaction |
-| Render: API | `domain` | auction.ts | Pure functions: `rank`, `detectTrigger`, `extendClose`, `status` |
+| Render: API | `api` | FastAPI REST API `/api` | Mock auth, request validation, role-shaped responses, bid transaction |
+| Render: API | `domain` | auction.py | Pure functions: `rank`, `detect_trigger`, `extend_close`, `status` |
 | Render: API | `ws` | Socket.IO server | Rooms `list`, `rfq:<id>`; payload `{ rfqId }` only |
-| Render: DB | `db` | PostgreSQL (Prisma) | Tables below |
+| Render: DB | `db` | PostgreSQL (SQLAlchemy, Alembic) | Tables below |
 | Render: DB (inside `db`) | `t_user` | User | id, name, company, role |
 | Render: DB (inside `db`) | `t_rfq` | Rfq | refId, bidStartAt, bidCloseAt, currentCloseAt, forcedCloseAt, pickupDate, triggerWindowMin (X), extensionMin (Y), triggerType |
 | Render: DB (inside `db`) | `t_bid` | Bid | carrierName, freight/origin/destination charges, totalAmount, transitTimeDays, quoteValidUntil |
@@ -97,7 +97,7 @@ A finished version drawn from this spec is in [`architecture.png`](architecture.
 | `supplier` | `web` | solid | HTTPS |
 | `web` | `api` | solid | REST / JSON (GET data, POST bids) |
 | `api` | `domain` | solid | uses |
-| `api` | `db` | solid, both directions | Prisma transaction, `SELECT ... FOR UPDATE` |
+| `api` | `db` | solid, both directions | SQLAlchemy transaction, `SELECT ... FOR UPDATE` |
 | `api` | `ws` | solid | emit after commit |
 | `ws` | `web` | dashed | WebSocket: `rfq:updated { rfqId }` |
 
@@ -126,21 +126,21 @@ flowchart LR
         end
     end
 
-    subgraph Render_API["Render: API service (Node 20, Express 5)"]
-        api["Express REST API /api<br/>auth, zod, role-shaped responses,<br/>bid transaction + row lock"]
-        domain["auction.ts<br/>rank, detectTrigger, extendClose, status"]
+    subgraph Render_API["Render: API service (Python 3.12, FastAPI)"]
+        api["FastAPI REST API /api<br/>auth, validation, role-shaped responses,<br/>bid transaction + row lock"]
+        domain["auction.py<br/>rank, detect_trigger, extend_close, status"]
         ws["Socket.IO server<br/>rooms: list, rfq:id"]
     end
 
     subgraph Render_DB["Render: database"]
-        db[("PostgreSQL via Prisma<br/>User, Rfq, Bid, AuctionEvent")]
+        db[("PostgreSQL via SQLAlchemy<br/>User, Rfq, Bid, AuctionEvent")]
     end
 
     buyer -- HTTPS --> web
     supplier -- HTTPS --> web
     client -- "REST / JSON" --> api
     api -- uses --> domain
-    api <-- "Prisma tx, SELECT ... FOR UPDATE" --> db
+    api <-- "SQLAlchemy tx, SELECT ... FOR UPDATE" --> db
     api -- "emit after commit" --> ws
     ws -. "rfq:updated { rfqId }" .-> live
 ```
@@ -149,7 +149,7 @@ flowchart LR
 sequenceDiagram
     autonumber
     participant S as Supplier browser
-    participant API as Express API
+    participant API as FastAPI
     participant DB as PostgreSQL
     participant IO as Socket.IO
     participant O as Other browsers

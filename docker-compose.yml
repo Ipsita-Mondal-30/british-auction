@@ -1,5 +1,5 @@
 # Local Postgres for development: docker compose up -d
-# Matches backend/.env.example: postgresql://postgres:postgres@localhost:5432/british_auction
+# Matches backend-py/.env.example: postgresql://postgres:postgres@localhost:5432/british_auction
 services:
   db:
     image: postgres:17

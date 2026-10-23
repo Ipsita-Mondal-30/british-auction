@@ -75,20 +75,26 @@ A supplier's bid reaches every open page over WebSockets: the ranking reorders, 
 
 ![Live update toast](docs/screenshots/08-live-update-toast.png)
 
+### 9. Interactive API docs
+
+FastAPI generates OpenAPI docs for every endpoint, served at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs), where each request can be tried from the browser.
+
+![Interactive API docs](docs/screenshots/09-api-docs.png)
+
 ## Assignment checklist
 
 | Requirement (from the brief) | Status | Where |
 |---|---|---|
 | RFQ creation: name/reference ID, bid start, bid close, forced close, pickup/service date | Done | `frontend/app/auctions/new`, `POST /api/rfqs` |
 | Quote form: carrier, freight/origin/destination charges, transit time, validity | Done | `frontend/components/BidForm.tsx`, `POST /api/rfqs/:id/bids` |
-| Trigger window X, extension duration Y | Done | `backend/src/auction.ts` (`inTriggerWindow`, `extendClose`) |
-| Triggers: bid received, any rank change, L1 change | Done | `detectTrigger` in `backend/src/auction.ts` |
-| Forced close > bid close; extensions never exceed forced close | Done | zod refine in `routes.ts`; `extendClose` caps with `min()` |
+| Trigger window X, extension duration Y | Done | `backend-py/app/auction.py` (`in_trigger_window`, `extend_close`) |
+| Triggers: bid received, any rank change, L1 change | Done | `detect_trigger` in `backend-py/app/auction.py` |
+| Forced close > bid close; extensions never exceed forced close | Done | `rfq_input` in `backend-py/app/validation.py`; `extend_close` caps with `min()` |
 | Listing: name/ID, current lowest bid, current close, forced close, status | Done | `frontend/app/auctions/page.tsx` |
 | Details: ranked bids L1/L2/L3, every bid sorted by price, quote details, X/Y config, activity log with extension reasons | Done | `frontend/app/auctions/[id]/page.tsx` |
 | HLD with architecture diagram | Done | `docs/HLD.md`, `docs/architecture.png` |
-| Schema design | Done | `docs/SCHEMA.md`, `backend/prisma/schema.prisma` |
-| Backend code, frontend code | Done | `backend/`, `frontend/` |
+| Schema design | Done | `docs/SCHEMA.md`, `backend-py/app/models.py`, `backend-py/alembic/versions/0001_initial.py` |
+| Backend code, frontend code | Done | `backend-py/`, `frontend/` |
 
 Beyond the brief: live updates over WebSockets, toast notifications, role-based visibility, a row lock per auction, server-synced countdowns and unit tests for the auction rules.
 
@@ -97,19 +103,21 @@ Beyond the brief: live updates over WebSockets, toast notifications, role-based 
 | Layer | Tech | Hosting |
 |---|---|---|
 | Frontend | Next.js 16 (App Router), React 19, Tailwind v4, Phosphor icons, Sonner (toasts), socket.io-client | Vercel |
-| Backend | Node 20, Express 5, TypeScript, Socket.IO, zod | Render |
-| Database | PostgreSQL via Prisma 6 | Render Postgres |
+| Backend | Python 3.12, FastAPI, Uvicorn, python-socketio, SQLAlchemy 2 (async, asyncpg) | Render |
+| Database | PostgreSQL, migrations with Alembic | Render Postgres |
 
 Vercel can't hold WebSocket connections, so the realtime API runs on Render as a long-lived process.
 
 ```
-backend/
-  prisma/schema.prisma     schema (deliverable)
-  prisma/seed.ts           demo data, times relative to now
-  src/auction.ts           pure auction rules (ranking, triggers, extension, status)
-  src/auction.test.ts      unit tests for the rules
-  src/routes.ts            REST API, validation, bid transaction
-  src/index.ts             Express + Socket.IO bootstrap
+backend-py/
+  app/models.py            schema as SQLAlchemy models (deliverable)
+  alembic/                 migrations (0001 creates the schema)
+  app/seed.py              demo data, times relative to now
+  app/auction.py           pure auction rules (ranking, triggers, extension, status)
+  tests/test_auction.py    unit tests for the rules
+  app/routes.py            REST API, bid transaction
+  app/validation.py        request validation and error messages
+  app/main.py              FastAPI + Socket.IO bootstrap
 frontend/
   app/                     pages: login, listing, create, details
   components/              BidForm, shared UI
@@ -120,20 +128,21 @@ docs/                      HLD and schema
 
 ## Run locally
 
-Prerequisites: Node 20+, and either Docker or a local PostgreSQL.
+Prerequisites: Python 3.12, Node 20+ (for the frontend), and either Docker or a local PostgreSQL.
 
 ```bash
-# 1. Database (Docker; matches backend/.env.example)
+# 1. Database (Docker; matches backend-py/.env.example)
 docker compose up -d
-#    or with a local Postgres: createdb british_auction, then edit DATABASE_URL in backend/.env
+#    or with a local Postgres: createdb british_auction, then edit DATABASE_URL in backend-py/.env
 
 # 2. Backend (http://localhost:4000)
-cd backend
+cd backend-py
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 cp .env.example .env
-npm install
-npx prisma migrate deploy
-npm run seed                  # resets data: 1 buyer, 4 suppliers, 5 RFQs
-npm run dev
+.venv/bin/alembic upgrade head        # create the tables
+.venv/bin/python -m app.seed          # resets data: 1 buyer, 4 suppliers, 5 RFQs
+.venv/bin/python -m app               # auto-reloads
 
 # 3. Frontend (http://localhost:3000)
 cd ../frontend
@@ -142,7 +151,7 @@ npm install
 npm run dev
 ```
 
-If the frontend runs on a port other than 3000, add that origin to `FRONTEND_ORIGIN` in `backend/.env` (comma-separated).
+If the frontend runs on a port other than 3000, add that origin to `FRONTEND_ORIGIN` in `backend-py/.env` (comma-separated).
 
 ### Try it
 
@@ -151,12 +160,12 @@ If the frontend runs on a port other than 3000, add that origin to `FRONTEND_ORI
 3. As the supplier, bid below the current L1. Both tabs update instantly: the close moves 5 minutes later, a notice explains why, and the activity log records the reason.
 4. Other things to try: bid higher than your own last bid (rejected), bid on a closed RFQ (rejected), or create an RFQ with forced close before close (rejected inline).
 
-Re-run `npm run seed` any time to reset the demo clock.
+Re-run `.venv/bin/python -m app.seed` (in `backend-py`) any time to reset the demo clock.
 
 ### Tests
 
 ```bash
-cd backend && npm test    # auction rules
+cd backend-py && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pytest   # auction rules
 cd frontend && npm test   # CSV export escaping
 ```
 
@@ -164,7 +173,7 @@ The tests cover ranking and ties, the trigger window boundaries, each trigger ty
 
 ## API
 
-All routes are under `/api`. Every route except `/health` and `/users` needs an `x-user-id` header (mock auth).
+All routes are under `/api`. Every route except `/health` and `/users` needs an `x-user-id` header (mock auth). FastAPI also serves interactive API docs at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs).
 
 | Method | Path | Who | |
 |---|---|---|---|
