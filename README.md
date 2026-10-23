@@ -25,6 +25,56 @@ A freight RFQ platform with British auction (reverse auction) bidding. Suppliers
 - The close never goes past the forced close time.
 - Each new bid from a supplier must be lower than that supplier's previous bid.
 
+## Screenshots
+
+### 1. Sign in
+
+Pick a seeded buyer or supplier (mock auth). Login is per browser tab, so a buyer and a supplier can be open side by side.
+
+![Sign in](docs/screenshots/01-sign-in.png)
+
+### 2. Auction listing
+
+Every RFQ with its status (Active, Upcoming, Closed, Force closed), current lowest bid, live time left, current close time with how far it has been extended, and forced close time. Filter by status or search by name or ID.
+
+![Auction listing](docs/screenshots/02-auction-listing.png)
+
+### 3. Create RFQ
+
+Name, reference ID, pickup / service date, bid start, bid close and forced close, the trigger window (X), the extension duration (Y) and the trigger type. The side panel explains in plain words how the auction will run and how many extensions fit before the forced close. Invalid input, such as a forced close before the bid close, is flagged inline.
+
+![Create RFQ](docs/screenshots/03-create-rfq.png)
+
+### 4. Auction details (buyer)
+
+Live countdown, current close (original time plus extensions), forced close and L1 price. The timeline bar shows the scheduled window, the time added by extensions and the headroom left before the forced close.
+
+![Auction details](docs/screenshots/04-auction-details.png)
+
+### 5. Supplier ranking and full bid history
+
+The ranking shows each supplier's latest quote as L1, L2, L3… with every charge, transit time and quote validity, and exports to CSV. Below it, every bid ever placed, sorted by price; quotes a supplier has since lowered are marked superseded.
+
+![Supplier ranking and all bids](docs/screenshots/05-ranking-and-all-bids.png)
+
+### 6. Quote submission (supplier)
+
+A supplier sees their own rank, latest bid and gap to L1, submits or lowers a quote with a running total, and sees their own bid history. Competitors stay anonymous in the activity log.
+
+![Supplier quote form](docs/screenshots/06-supplier-quote-form.png)
+
+### 7. Auction rules and activity log
+
+The configured trigger, X and Y. The activity log records every bid and every extension, with the reason (for example "L1 changed: Rahul Verma → Ananya Iyer in the last 10 min → extended by 5 min") and the old and new close times.
+
+![Auction rules and activity log](docs/screenshots/07-rules-and-activity-log.png)
+
+### 8. Live updates
+
+A supplier's bid reaches every open page over WebSockets: the ranking reorders, the L1 price updates and a toast appears, with no refresh.
+
+![Live update toast](docs/screenshots/08-live-update-toast.png)
+
 ## Assignment checklist
 
 | Requirement (from the brief) | Status | Where |
