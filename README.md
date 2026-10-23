@@ -2,7 +2,7 @@
 
 A freight RFQ platform with British auction (reverse auction) bidding. Suppliers keep lowering their quotes. Activity close to the end extends the auction, and a forced close time caps it.
 
-- **Live demo:** _frontend URL here_ · _API URL here_
+- **Live demo:** [british-auction.vercel.app](https://british-auction.vercel.app) · API: [british-auction-api-zbjx.onrender.com](https://british-auction-api-zbjx.onrender.com/api/health)
 - **Design docs:** [High-level design](docs/HLD.md) · [Database schema](docs/SCHEMA.md) · [Architecture diagram prompt](docs/ARCHITECTURE_DIAGRAM_PROMPT.md)
 
 ![Architecture](docs/architecture.png)
