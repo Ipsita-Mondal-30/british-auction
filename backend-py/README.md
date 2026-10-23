@@ -23,7 +23,7 @@ If the frontend runs on a port other than 3000, add its origin to `FRONTEND_ORIG
 
 ## Database migrations
 
-Alembic manages the schema. Migration `0001` creates the four tables.
+Alembic manages the schema. Migration `0001` creates the four tables; `0002` adds CHECK constraints for timestamp order and money invariants.
 
 ```bash
 .venv/bin/alembic upgrade head    # empty database: create the tables
@@ -51,7 +51,7 @@ A database created by the earlier Node/Prisma version of this API already has th
 | `app/realtime.py` | Socket.IO rooms (`list`, `rfq:<id>`) and the `rfq:updated` broadcast |
 | `app/routes.py` | REST routes under `/api`, mock auth (`x-user-id`), buyer and supplier views, bid transaction |
 | `app/validation.py` | Request validation and field error messages |
-| `app/auction.py` | Pure auction rules: ranking, trigger window, triggers, extension cap, status |
+| `app/auction.py` | Pure auction rules: ranking, trigger window, extension strategies (one class per trigger), extension cap, status |
 | `app/serialize.py` | Rows to JSON (camelCase, ISO timestamps, money strings) |
 | `app/openapi.py` | API docs: overview text, tags, error examples; drops FastAPI's default 422 (the API uses 400) |
 | `app/schemas.py` | Documentation-only request/response models for Swagger UI (they never change what the API accepts or returns) |

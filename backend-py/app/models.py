@@ -6,7 +6,7 @@ the API created the schema; keeping it unchanged means existing databases need n
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Index, Integer, Numeric, Text, TypeDecorator, func
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Integer, Numeric, Text, TypeDecorator, func
 from sqlalchemy.dialects.postgresql import ENUM, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -48,7 +48,17 @@ class User(Base):
 
 class Rfq(Base):
     __tablename__ = 'Rfq'
-    __table_args__ = (Index('Rfq_refId_key', 'refId', unique=True),)
+    __table_args__ = (
+        Index('Rfq_refId_key', 'refId', unique=True),
+        # Database-level invariants (migration 0002); the API validates the same rules first.
+        CheckConstraint('"bidCloseAt" > "bidStartAt"', name='rfq_close_after_start'),
+        CheckConstraint('"forcedCloseAt" > "bidCloseAt"', name='rfq_forced_after_close'),
+        CheckConstraint('"currentCloseAt" >= "bidCloseAt" AND "currentCloseAt" <= "forcedCloseAt"', name='rfq_current_close_within_cap'),
+        CheckConstraint('"triggerWindowMin" BETWEEN 1 AND 1440', name='rfq_trigger_window_range'),
+        CheckConstraint('"extensionMin" BETWEEN 1 AND 1440', name='rfq_extension_range'),
+        CheckConstraint('length(btrim("refId")) > 0', name='rfq_ref_id_not_blank'),
+        CheckConstraint('length(btrim("name")) > 0', name='rfq_name_not_blank'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_id: Mapped[str] = mapped_column('refId', Text)
@@ -71,7 +81,14 @@ class Rfq(Base):
 
 class Bid(Base):
     __tablename__ = 'Bid'
-    __table_args__ = (Index('Bid_rfqId_supplierId_createdAt_idx', 'rfqId', 'supplierId', 'createdAt'),)
+    __table_args__ = (
+        Index('Bid_rfqId_supplierId_createdAt_idx', 'rfqId', 'supplierId', 'createdAt'),
+        CheckConstraint('"freightCharges" >= 0 AND "originCharges" >= 0 AND "destinationCharges" >= 0', name='bid_charges_non_negative'),
+        CheckConstraint('"totalAmount" = "freightCharges" + "originCharges" + "destinationCharges"', name='bid_total_is_sum_of_charges'),
+        CheckConstraint('"totalAmount" > 0', name='bid_total_positive'),
+        CheckConstraint('"transitTimeDays" BETWEEN 1 AND 365', name='bid_transit_range'),
+        CheckConstraint('length(btrim("carrierName")) > 0', name='bid_carrier_not_blank'),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rfq_id: Mapped[int] = mapped_column('rfqId', ForeignKey('Rfq.id', ondelete='RESTRICT', onupdate='CASCADE'))
@@ -98,7 +115,13 @@ class AuctionEvent(Base):
     """Append-only activity log."""
 
     __tablename__ = 'AuctionEvent'
-    __table_args__ = (Index('AuctionEvent_rfqId_createdAt_idx', 'rfqId', 'createdAt'),)
+    __table_args__ = (
+        Index('AuctionEvent_rfqId_createdAt_idx', 'rfqId', 'createdAt'),
+        CheckConstraint(
+            'type <> \'TIME_EXTENDED\' OR ("oldCloseAt" IS NOT NULL AND "newCloseAt" IS NOT NULL AND "newCloseAt" > "oldCloseAt")',
+            name='event_extension_moves_close_later',
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rfq_id: Mapped[int] = mapped_column('rfqId', ForeignKey('Rfq.id', ondelete='RESTRICT', onupdate='CASCADE'))

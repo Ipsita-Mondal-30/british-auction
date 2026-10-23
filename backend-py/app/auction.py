@@ -1,9 +1,10 @@
 """Pure auction rules. No DB, no clock: everything takes `now` as an argument so it is testable."""
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Literal, Protocol, TypeVar
+from typing import ClassVar, Literal, Protocol, TypeVar, get_args
 
 TriggerType = Literal['BID_RECEIVED', 'ANY_RANK_CHANGE', 'L1_CHANGE']
 Status = Literal['UPCOMING', 'ACTIVE', 'CLOSED', 'FORCE_CLOSED']
@@ -43,20 +44,50 @@ def in_trigger_window(now: datetime, current_close_at: datetime, window_min: int
     return current_close_at - timedelta(minutes=window_min) <= now < current_close_at
 
 
-def detect_trigger(
-    type: TriggerType,
-    before: Sequence[RankableBid],
-    after: Sequence[RankableBid],
-    name: Callable[[int], str],
-) -> str | None:
+class BaseExtensionStrategy(ABC):
     """
-    Compares rankings before and after a bid. Returns a human-readable cause if the
-    configured trigger fired, or None if it did not.
+    One extension trigger. `detect` compares the ranking before and after an accepted bid and returns a
+    human-readable cause if the auction should extend, or None. A new trigger type is a new subclass
+    registered in STRATEGIES; the bid engine (routes.place_bid) never changes.
     """
-    if type == 'BID_RECEIVED':
+
+    trigger_type: ClassVar[TriggerType]
+
+    @abstractmethod
+    def detect(self, before: Sequence[RankableBid], after: Sequence[RankableBid], name: Callable[[int], str]) -> str | None: ...
+
+
+class BidReceivedStrategy(BaseExtensionStrategy):
+    trigger_type = 'BID_RECEIVED'
+
+    def detect(self, before, after, name):
         return 'New bid received in trigger window'
 
-    if type == 'L1_CHANGE':
+
+class AnyRankChangeStrategy(BaseExtensionStrategy):
+    """Fires only if a previously ranked supplier moved. A new entrant at the bottom displaces nobody."""
+
+    trigger_type = 'ANY_RANK_CHANGE'
+
+    def detect(self, before, after, name):
+        before_rank = {b.supplier_id: i + 1 for i, b in enumerate(before)}
+        after_rank = {b.supplier_id: i + 1 for i, b in enumerate(after)}
+        if not any(after_rank.get(b.supplier_id) != before_rank[b.supplier_id] for b in before):
+            return None
+        changes = []
+        for b in after:
+            old, new = before_rank.get(b.supplier_id), after_rank[b.supplier_id]
+            if old != new:
+                changes.append(f'{name(b.supplier_id)} {f"L{old}" if old else "new"}→L{new}')
+        return f'Rank change: {", ".join(changes)}'
+
+
+class L1RankChangeStrategy(BaseExtensionStrategy):
+    """Fires only when a different supplier becomes the lowest bidder."""
+
+    trigger_type = 'L1_CHANGE'
+
+    def detect(self, before, after, name):
         prev = before[0].supplier_id if before else None
         nxt = after[0].supplier_id if after else None
         # First-ever bid is not a "change"; L1 undercutting themselves is not a change either.
@@ -64,18 +95,22 @@ def detect_trigger(
             return None
         return f'L1 changed: {name(prev)} → {name(nxt)}'
 
-    # ANY_RANK_CHANGE: fires only if a previously ranked supplier moved.
-    # A new entrant at the bottom displaces nobody, so it does not count.
-    before_rank = {b.supplier_id: i + 1 for i, b in enumerate(before)}
-    after_rank = {b.supplier_id: i + 1 for i, b in enumerate(after)}
-    if not any(after_rank.get(b.supplier_id) != before_rank[b.supplier_id] for b in before):
-        return None
-    changes = []
-    for b in after:
-        old, new = before_rank.get(b.supplier_id), after_rank[b.supplier_id]
-        if old != new:
-            changes.append(f'{name(b.supplier_id)} {f"L{old}" if old else "new"}→L{new}')
-    return f'Rank change: {", ".join(changes)}'
+
+STRATEGIES: dict[str, BaseExtensionStrategy] = {
+    s.trigger_type: s for s in (BidReceivedStrategy(), AnyRankChangeStrategy(), L1RankChangeStrategy())
+}
+# Every trigger type the API accepts must have exactly one strategy.
+assert set(STRATEGIES) == set(get_args(TriggerType)), 'each TriggerType needs a strategy'
+
+
+def detect_trigger(
+    type: TriggerType,
+    before: Sequence[RankableBid],
+    after: Sequence[RankableBid],
+    name: Callable[[int], str],
+) -> str | None:
+    """Cause of the extension if the auction's configured trigger fired, else None."""
+    return STRATEGIES[type].detect(before, after, name)
 
 
 def extend_close(current_close_at: datetime, forced_close_at: datetime, extension_min: int) -> datetime | None:

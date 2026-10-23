@@ -2,7 +2,23 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from itertools import count
 
-from app.auction import detect_trigger, extend_close, in_trigger_window, is_open, rank, status, to_cents
+from typing import get_args
+
+from app.auction import (
+    STRATEGIES,
+    AnyRankChangeStrategy,
+    BaseExtensionStrategy,
+    BidReceivedStrategy,
+    L1RankChangeStrategy,
+    TriggerType,
+    detect_trigger,
+    extend_close,
+    in_trigger_window,
+    is_open,
+    rank,
+    status,
+    to_cents,
+)
 
 
 def t(hhmm: str) -> datetime:
@@ -100,3 +116,34 @@ def test_status_derivation():
     assert status(start, close, forced, t('17:30')) == 'ACTIVE'
     assert status(start, close, forced, t('18:00')) == 'CLOSED'
     assert status(start, t('18:30'), forced, t('18:30')) == 'FORCE_CLOSED'
+
+
+def test_every_trigger_type_has_exactly_one_strategy():
+    assert set(STRATEGIES) == set(get_args(TriggerType))
+    assert {type(s) for s in STRATEGIES.values()} == {BidReceivedStrategy, AnyRankChangeStrategy, L1RankChangeStrategy}
+    assert all(isinstance(s, BaseExtensionStrategy) for s in STRATEGIES.values())
+
+
+def test_strategies_work_in_isolation():
+    a, b = bid(1, 1000), bid(2, 1200)
+    before, overtaken = rank([a, b]), rank([a, b, bid(2, 900)])
+    assert BidReceivedStrategy().detect(before, overtaken, name) == 'New bid received in trigger window'
+    assert AnyRankChangeStrategy().detect(before, overtaken, name) == 'Rank change: B L2→L1, A L1→L2'
+    assert L1RankChangeStrategy().detect(before, overtaken, name) == 'L1 changed: A → B'
+
+
+def test_a_new_strategy_plugs_in_without_engine_changes():
+    class BigDropStrategy(BaseExtensionStrategy):
+        """Example: extend only when L1 drops by more than 10%."""
+
+        trigger_type = 'BIG_DROP'  # type: ignore[assignment]
+
+        def detect(self, before, after, name):
+            if before and after and after[0].total_cents < before[0].total_cents * 0.9:
+                return 'L1 dropped by more than 10%'
+            return None
+
+    registry = {**STRATEGIES, 'BIG_DROP': BigDropStrategy()}
+    a = bid(1, 1000)
+    assert registry['BIG_DROP'].detect(rank([a]), rank([a, bid(2, 850)]), name) == 'L1 dropped by more than 10%'
+    assert registry['BIG_DROP'].detect(rank([a]), rank([a, bid(2, 950)]), name) is None
