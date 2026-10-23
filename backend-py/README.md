@@ -35,7 +35,9 @@ Alembic manages the schema. Its first migration, `0001`, creates exactly the tab
 
 | Path | |
 |---|---|
-| `app/main.py` | FastAPI app, CORS, Socket.IO rooms (`list`, `rfq:<id>`) |
+| `app/main.py` | FastAPI app, CORS, mounts Socket.IO |
+| `app/realtime.py` | Socket.IO rooms (`list`, `rfq:<id>`) and the `rfq:updated` broadcast |
+| `app/validation.py` | Request validation with the same rules and messages as the Node API |
 | `app/auction.py` | Pure auction rules: ranking, trigger window, triggers, extension cap, status |
 | `app/routes.py` | REST routes under `/api`, mock auth (`x-user-id`), buyer and supplier views |
 | `app/serialize.py` | Rows to JSON in the same shape as the Node API (camelCase, ISO timestamps, money strings) |
