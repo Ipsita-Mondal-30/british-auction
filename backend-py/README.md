@@ -14,12 +14,21 @@ cp .env.example .env          # set DATABASE_URL to your local Postgres
 
 To point the frontend at it, set `NEXT_PUBLIC_API_URL=http://localhost:4001` in `frontend/.env.local` and add the frontend's origin to `FRONTEND_ORIGIN` here.
 
+## Tests
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest
+```
+
 ## Layout
 
 | Path | |
 |---|---|
 | `app/main.py` | FastAPI app, CORS, Socket.IO rooms (`list`, `rfq:<id>`) |
+| `app/auction.py` | Pure auction rules: ranking, trigger window, triggers, extension cap, status |
 | `app/routes.py` | REST routes under `/api` |
 | `app/errors.py` | `{ error, issues? }` error responses |
 | `app/config.py` | `DATABASE_URL`, `FRONTEND_ORIGIN`, `PORT` from env or `.env` |
 | `app/timefmt.py` | Timestamps in the same format as the Node API |
+| `tests/` | pytest unit tests for the auction rules |
