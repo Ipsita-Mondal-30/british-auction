@@ -12,6 +12,12 @@ cp .env.example .env          # set DATABASE_URL to your local Postgres
 .venv/bin/python -m app       # http://localhost:4001, auto-reloads
 ```
 
+Load the demo data (1 buyer, 4 suppliers, 5 RFQs, times relative to now). It wipes every table, so it refuses a non-local database unless you add `--force`:
+
+```bash
+.venv/bin/python -m app.seed
+```
+
 To point the frontend at it, set `NEXT_PUBLIC_API_URL=http://localhost:4001` in `frontend/.env.local` and add the frontend's origin to `FRONTEND_ORIGIN` here.
 
 ## Database migrations
@@ -45,6 +51,7 @@ Alembic manages the schema. Its first migration, `0001`, creates exactly the tab
 | `app/models.py` | SQLAlchemy models for the shared tables (`User`, `Rfq`, `Bid`, `AuctionEvent`) |
 | `app/db.py` | Async database engine and sessions (asyncpg) |
 | `alembic/` | Schema migrations |
+| `app/seed.py` | Demo data |
 | `app/config.py` | `DATABASE_URL`, `FRONTEND_ORIGIN`, `PORT` from env or `.env` |
 | `app/timefmt.py` | Timestamps in the same format as the Node API |
 | `tests/` | pytest unit tests for the auction rules |
