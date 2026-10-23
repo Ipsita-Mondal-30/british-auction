@@ -11,5 +11,11 @@ frontend/out/
 frontend/next-env.d.ts
 *.tsbuildinfo
 
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 .DS_Store
 .vercel
