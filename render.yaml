@@ -1,0 +1,27 @@
+# Render Blueprint: Postgres + API. The frontend deploys separately on Vercel (see DEPLOY.md).
+# Paid plans by default so the API doesn't sleep (sleeping drops WebSocket connections).
+# Zero-cost demo: set both plans to `free` (the free database expires after 30 days).
+databases:
+  - name: british-auction-db
+    databaseName: british_auction
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: british-auction-api
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm ci && npx prisma generate && npm run build
+    # Migrations run at start so this works on every plan (preDeployCommand is paid-only).
+    startCommand: npx prisma migrate deploy && node dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: british-auction-db
+          property: connectionString
+      - key: FRONTEND_ORIGIN
+        sync: false # your Vercel URL, e.g. https://british-auction.vercel.app (comma-separate several)

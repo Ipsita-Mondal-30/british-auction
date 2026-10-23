@@ -1,0 +1,16 @@
+# Local Postgres for development: docker compose up -d
+# Matches backend/.env.example: postgresql://postgres:postgres@localhost:5432/british_auction
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: british_auction
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:

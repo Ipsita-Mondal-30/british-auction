@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#111111"/>
+    </marker>
+    <style>
+      .t { fill: #111111; }
+      .m { fill: #4b4b4f; }
+      .s { fill: #6b6b70; }
+      .zone { fill: #efefec; }
+      .node { fill: #ffffff; stroke: #111111; stroke-width: 1.5; }
+      .inner { fill: #f7f7f5; stroke: #d4d4cf; stroke-width: 1; }
+      .edge { stroke: #111111; stroke-width: 1.6; fill: none; }
+      .live { stroke: #111111; stroke-width: 1.6; fill: none; stroke-dasharray: 6 5; }
+      .lbl { font-size: 11.5px; fill: #4b4b4f; }
+      .zt { font-size: 15px; font-weight: 700; fill: #111111; }
+      .zs { font-size: 12px; fill: #6b6b70; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1080" fill="#f7f7f5"/>
+
+  <!-- Title -->
+  <text x="40" y="50" class="t" font-size="24" font-weight="700">British Auction RFQ System: Architecture</text>
+  <text x="40" y="76" class="m" font-size="13">Next.js on Vercel, Express + Socket.IO on Render, PostgreSQL. Live reverse-auction bidding with auto-extension and a forced close.</text>
+
+  <!-- Zones -->
+  <rect x="40" y="100" width="250" height="600" rx="16" class="zone"/>
+  <text x="60" y="132" class="zt">Clients</text>
+  <text x="60" y="152" class="zs">Browser tabs, per-tab mock login</text>
+
+  <rect x="340" y="100" width="360" height="600" rx="16" class="zone"/>
+  <text x="360" y="132" class="zt">Vercel</text>
+  <text x="360" y="152" class="zs">Frontend hosting</text>
+
+  <rect x="760" y="100" width="460" height="600" rx="16" class="zone"/>
+  <text x="780" y="132" class="zt">Render: API service</text>
+  <text x="780" y="152" class="zs">Node 20, Express 5, TypeScript, long-lived process</text>
+
+  <rect x="1280" y="100" width="280" height="600" rx="16" class="zone"/>
+  <text x="1300" y="132" class="zt">Render: database</text>
+  <text x="1300" y="152" class="zs">Managed PostgreSQL</text>
+
+  <!-- Clients -->
+  <rect x="65" y="190" width="200" height="110" rx="12" class="node"/>
+  <text x="85" y="226" class="t" font-size="16" font-weight="700">Buyer</text>
+  <text x="85" y="252" class="m" font-size="12">Creates RFQs, sets X, Y</text>
+  <text x="85" y="270" class="m" font-size="12">and trigger; sees every</text>
+  <text x="85" y="288" class="m" font-size="12">quote ranked L1, L2, L3</text>
+
+  <rect x="65" y="430" width="200" height="110" rx="12" class="node"/>
+  <text x="85" y="466" class="t" font-size="16" font-weight="700">Supplier</text>
+  <text x="85" y="492" class="m" font-size="12">Submits and lowers quotes;</text>
+  <text x="85" y="510" class="m" font-size="12">sees own rank and the L1</text>
+  <text x="85" y="528" class="m" font-size="12">price only</text>
+
+  <!-- Next.js app -->
+  <rect x="365" y="175" width="310" height="500" rx="12" class="node"/>
+  <text x="385" y="211" class="t" font-size="16" font-weight="700">Next.js 16 app</text>
+  <text x="385" y="231" class="s" font-size="12">React 19, Tailwind v4, runs in the browser</text>
+
+  <rect x="385" y="250" width="270" height="66" rx="8" class="inner"/>
+  <text x="400" y="277" class="t" font-size="13" font-weight="700">Pages</text>
+  <text x="400" y="297" class="m" font-size="11.5">Login, Auctions, New RFQ, Details</text>
+
+  <rect x="385" y="328" width="270" height="66" rx="8" class="inner"/>
+  <text x="400" y="355" class="t" font-size="13" font-weight="700">REST client</text>
+  <text x="400" y="375" class="m" font-size="11.5">fetch + x-user-id header</text>
+
+  <rect x="385" y="406" width="270" height="66" rx="8" class="inner"/>
+  <text x="400" y="433" class="t" font-size="13" font-weight="700">Server-synced clock</text>
+  <text x="400" y="453" class="m" font-size="11.5">Offset from serverNow, display only</text>
+
+  <rect x="385" y="484" width="270" height="66" rx="8" class="inner"/>
+  <text x="400" y="511" class="t" font-size="13" font-weight="700">Live updates</text>
+  <text x="400" y="531" class="m" font-size="11.5">socket.io-client, rooms list and rfq:id</text>
+
+  <rect x="385" y="562" width="270" height="66" rx="8" class="inner"/>
+  <text x="400" y="589" class="t" font-size="13" font-weight="700">Notifications</text>
+  <text x="400" y="609" class="m" font-size="11.5">Toasts: outbid, new bids, extensions</text>
+
+  <!-- API: REST -->
+  <rect x="785" y="175" width="410" height="170" rx="12" fill="#111111"/>
+  <text x="805" y="210" fill="#ffffff" font-size="16" font-weight="700">Express REST API  /api</text>
+  <text x="805" y="240" fill="#d4d4cf" font-size="12.5">Mock auth via x-user-id header</text>
+  <text x="805" y="261" fill="#d4d4cf" font-size="12.5">zod validation on every write</text>
+  <text x="805" y="282" fill="#d4d4cf" font-size="12.5">Role-shaped responses (buyer vs supplier)</text>
+  <text x="805" y="303" fill="#d4d4cf" font-size="12.5">Bid transaction under a per-RFQ row lock</text>
+
+  <!-- API: domain -->
+  <rect x="785" y="375" width="280" height="120" rx="12" class="node"/>
+  <text x="805" y="406" class="t" font-size="14" font-weight="700">auction.ts (pure rules)</text>
+  <text x="805" y="431" class="m" font-size="12">rank(), detectTrigger(),</text>
+  <text x="805" y="449" class="m" font-size="12">extendClose(), status()</text>
+  <text x="805" y="476" class="s" font-size="11.5">No DB, no clock, unit-tested</text>
+
+  <!-- API: Socket.IO -->
+  <rect x="785" y="525" width="410" height="145" rx="12" class="node"/>
+  <text x="805" y="558" class="t" font-size="15" font-weight="700">Socket.IO server</text>
+  <text x="805" y="584" class="m" font-size="12.5">Rooms: list (all auctions), rfq:&lt;id&gt;</text>
+  <text x="805" y="605" class="m" font-size="12.5">Broadcasts carry only { rfqId }</text>
+  <text x="805" y="626" class="m" font-size="12.5">Clients refetch over REST with their role</text>
+
+  <!-- Database -->
+  <path d="M1305,200 V650 A115,16 0 0,0 1535,650 V200" class="node"/>
+  <ellipse cx="1420" cy="200" rx="115" ry="16" class="node"/>
+  <text x="1420" y="250" class="t" font-size="16" font-weight="700" text-anchor="middle">PostgreSQL</text>
+  <text x="1420" y="270" class="s" font-size="12" text-anchor="middle">Prisma ORM, migrations</text>
+
+  <rect x="1325" y="295" width="190" height="58" rx="8" class="inner"/>
+  <text x="1340" y="319" class="t" font-size="13" font-weight="700">User</text>
+  <text x="1340" y="339" class="m" font-size="11.5">role: buyer or supplier</text>
+
+  <rect x="1325" y="365" width="190" height="58" rx="8" class="inner"/>
+  <text x="1340" y="389" class="t" font-size="13" font-weight="700">Rfq</text>
+  <text x="1340" y="409" class="m" font-size="11.5">times, X, Y, trigger; lock</text>
+
+  <rect x="1325" y="435" width="190" height="58" rx="8" class="inner"/>
+  <text x="1340" y="459" class="t" font-size="13" font-weight="700">Bid</text>
+  <text x="1340" y="479" class="m" font-size="11.5">append-only quotes</text>
+
+  <rect x="1325" y="505" width="190" height="58" rx="8" class="inner"/>
+  <text x="1340" y="529" class="t" font-size="13" font-weight="700">AuctionEvent</text>
+  <text x="1340" y="549" class="m" font-size="11.5">append-only activity log</text>
+
+  <!-- Edges -->
+  <line x1="265" y1="245" x2="363" y2="245" class="edge" marker-end="url(#arrow)"/>
+  <text x="314" y="236" class="lbl" text-anchor="middle">HTTPS</text>
+  <line x1="265" y1="485" x2="363" y2="485" class="edge" marker-end="url(#arrow)"/>
+  <text x="314" y="476" class="lbl" text-anchor="middle">HTTPS</text>
+
+  <line x1="675" y1="270" x2="783" y2="270" class="edge" marker-end="url(#arrow)"/>
+  <text x="729" y="258" class="lbl" text-anchor="middle">REST / JSON</text>
+  <text x="729" y="290" class="lbl" text-anchor="middle">GET, POST bids</text>
+
+  <line x1="785" y1="600" x2="677" y2="600" class="live" marker-end="url(#arrow)"/>
+  <text x="731" y="588" class="lbl" text-anchor="middle">WebSocket</text>
+  <text x="731" y="620" class="lbl" text-anchor="middle">rfq:updated</text>
+
+  <line x1="925" y1="345" x2="925" y2="373" class="edge" marker-end="url(#arrow)"/>
+  <text x="935" y="364" class="lbl">uses</text>
+
+  <line x1="1110" y1="345" x2="1110" y2="523" class="edge" marker-end="url(#arrow)"/>
+  <text x="1120" y="430" class="lbl">emit after</text>
+  <text x="1120" y="446" class="lbl">commit</text>
+
+  <line x1="1197" y1="240" x2="1303" y2="240" class="edge" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="1250" y="228" class="lbl" text-anchor="middle">Prisma tx</text>
+  <text x="1250" y="260" class="lbl" text-anchor="middle">row lock</text>
+
+  <!-- Bid placement flow -->
+  <text x="40" y="752" class="t" font-size="17" font-weight="700">Bid placement (critical path)</text>
+
+  <g font-size="12">
+    <rect x="40" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="64" cy="797" r="12" fill="#111111"/><text x="64" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">1</text>
+    <text x="84" y="802" class="t" font-size="14" font-weight="700">Submit bid</text>
+    <text x="56" y="834" class="m">POST /rfqs/:id/bids,</text>
+    <text x="56" y="852" class="m">stamped at arrival</text>
+
+    <rect x="258" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="282" cy="797" r="12" fill="#111111"/><text x="282" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">2</text>
+    <text x="302" y="802" class="t" font-size="14" font-weight="700">Lock auction</text>
+    <text x="274" y="834" class="m">BEGIN; SELECT Rfq</text>
+    <text x="274" y="852" class="m">FOR UPDATE</text>
+
+    <rect x="476" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="500" cy="797" r="12" fill="#111111"/><text x="500" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">3</text>
+    <text x="520" y="802" class="t" font-size="14" font-weight="700">Validate</text>
+    <text x="492" y="834" class="m">start &lt;= now &lt; close;</text>
+    <text x="492" y="852" class="m">below own last bid</text>
+
+    <rect x="694" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="718" cy="797" r="12" fill="#111111"/><text x="718" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">4</text>
+    <text x="738" y="802" class="t" font-size="14" font-weight="700">Record</text>
+    <text x="710" y="834" class="m">INSERT Bid and a</text>
+    <text x="710" y="852" class="m">BID_PLACED event</text>
+
+    <rect x="912" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="936" cy="797" r="12" fill="#111111"/><text x="936" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">5</text>
+    <text x="956" y="802" class="t" font-size="14" font-weight="700">Check trigger</text>
+    <text x="928" y="834" class="m">Re-rank; in last X min</text>
+    <text x="928" y="852" class="m">and rule (a/b/c) fired?</text>
+
+    <rect x="1130" y="772" width="192" height="118" rx="12" class="node"/>
+    <circle cx="1154" cy="797" r="12" fill="#111111"/><text x="1154" y="801.5" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">6</text>
+    <text x="1174" y="802" class="t" font-size="14" font-weight="700">Extend</text>
+    <text x="1146" y="834" class="m">close = min(close + Y,</text>
+    <text x="1146" y="852" class="m">forced); log the reason</text>
+
+    <rect x="1348" y="772" width="192" height="118" rx="12" fill="#111111"/>
+    <circle cx="1372" cy="797" r="12" fill="#ffffff"/><text x="1372" y="801.5" fill="#111111" font-size="12" font-weight="700" text-anchor="middle">7</text>
+    <text x="1392" y="802" fill="#ffffff" font-size="14" font-weight="700">Commit, notify</text>
+    <text x="1364" y="834" fill="#d4d4cf">emit rfq:updated;</text>
+    <text x="1364" y="852" fill="#d4d4cf">clients refetch + toast</text>
+  </g>
+
+  <g>
+    <line x1="232" y1="831" x2="256" y2="831" class="edge" marker-end="url(#arrow)"/>
+    <line x1="450" y1="831" x2="474" y2="831" class="edge" marker-end="url(#arrow)"/>
+    <line x1="668" y1="831" x2="692" y2="831" class="edge" marker-end="url(#arrow)"/>
+    <line x1="886" y1="831" x2="910" y2="831" class="edge" marker-end="url(#arrow)"/>
+    <line x1="1104" y1="831" x2="1128" y2="831" class="edge" marker-end="url(#arrow)"/>
+    <line x1="1322" y1="831" x2="1346" y2="831" class="edge" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Guarantees -->
+  <text x="40" y="934" class="t" font-size="17" font-weight="700">Guarantees</text>
+  <g font-size="12.5">
+    <rect x="40" y="950" width="365" height="96" rx="12" class="node"/>
+    <text x="60" y="979" class="t" font-size="14" font-weight="700">Forced close is a hard cap</text>
+    <text x="60" y="1003" class="m">Extensions use min(close + Y, forced).</text>
+    <text x="60" y="1023" class="m">At the cap the trigger is logged, nothing moves.</text>
+
+    <rect x="425" y="950" width="365" height="96" rx="12" class="node"/>
+    <text x="445" y="979" class="t" font-size="14" font-weight="700">Server clock decides</text>
+    <text x="445" y="1003" class="m">The UI timer is display-only and skew-corrected.</text>
+    <text x="445" y="1023" class="m">Late bids are rejected on the server.</text>
+
+    <rect x="810" y="950" width="365" height="96" rx="12" class="node"/>
+    <text x="830" y="979" class="t" font-size="14" font-weight="700">Bids serialized per auction</text>
+    <text x="830" y="1003" class="m">A row lock stops two concurrent bids from</text>
+    <text x="830" y="1023" class="m">reading the same close time or ranking.</text>
+
+    <rect x="1195" y="950" width="365" height="96" rx="12" class="node"/>
+    <text x="1215" y="979" class="t" font-size="14" font-weight="700">No data in broadcasts</text>
+    <text x="1215" y="1003" class="m">Sockets send only the RFQ id; clients refetch,</text>
+    <text x="1215" y="1023" class="m">so suppliers never see competitor quotes.</text>
+  </g>
+</svg>
