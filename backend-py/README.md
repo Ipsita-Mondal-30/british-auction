@@ -37,6 +37,14 @@ Alembic manages the schema. Its first migration, `0001`, creates exactly the tab
 .venv/bin/pytest
 ```
 
+## Parity with the Node backend
+
+With both backends running against the same freshly seeded database, this sends identical requests to each and reports any difference in status code or JSON, key order included: every read for every user, about 70 rejected writes, and five scripted auctions covering each trigger type and the forced-close cap. It adds test RFQs, so reseed afterwards.
+
+```bash
+.venv/bin/python scripts/compare_backends.py --node http://localhost:4000/api --python http://localhost:4001/api
+```
+
 ## Layout
 
 | Path | |
@@ -55,3 +63,4 @@ Alembic manages the schema. Its first migration, `0001`, creates exactly the tab
 | `app/config.py` | `DATABASE_URL`, `FRONTEND_ORIGIN`, `PORT` from env or `.env` |
 | `app/timefmt.py` | Timestamps in the same format as the Node API |
 | `tests/` | pytest unit tests for the auction rules |
+| `scripts/compare_backends.py` | Node vs Python parity check |
