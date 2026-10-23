@@ -4,18 +4,21 @@ from datetime import timezone
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Path, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from . import auction as A
+from . import schemas as D
 from . import serialize as S
 from .db import get_session
 from .errors import HttpError
 from .models import AuctionEvent, Bid, Rfq, User
+from .openapi import errors
 from .realtime import rfq_updated
 from .timefmt import iso, now
 from .validation import DAY, bid_input, json_body, rfq_input
@@ -53,8 +56,12 @@ def parse_id(raw: str) -> int:
     return n
 
 
+# Declared as an API-key header so Swagger UI shows an Authorize button for it.
+user_header = APIKeyHeader(name='x-user-id', scheme_name='x-user-id', auto_error=False, description='Id of a seeded user (1 = buyer, 2–5 = suppliers)')
+
+
 # ponytail: mock auth — trusts the x-user-id header. Swap for real sessions/JWT before production.
-async def current_user(db: Db, x_user_id: Annotated[str | None, Header()] = None) -> User:
+async def current_user(db: Db, x_user_id: Annotated[str | None, Security(user_header)] = None) -> User:
     n = js_int(x_user_id)
     user = await db.get(User, n) if n is not None else None
     if user is None:
@@ -63,6 +70,7 @@ async def current_user(db: Db, x_user_id: Annotated[str | None, Header()] = None
 
 
 Me = Annotated[User, Depends(current_user)]
+RfqId = Annotated[str, Path(description='RFQ id', examples=['2'])]
 
 
 def require_role(user: User, role: str) -> User:
@@ -139,18 +147,22 @@ async def details(db: AsyncSession, id: int, user: User) -> dict:
     }
 
 
-@router.get('/health')
+@router.get('/health', tags=['Health'], summary='Health check', response_model=None,
+            responses={200: {'model': D.Health}}, description='Liveness probe (Render health check) and the server clock.')
 async def health():
     return {'ok': True, 'serverNow': iso(now())}
 
 
-@router.get('/users')
+@router.get('/users', tags=['Users'], summary='List users', response_model=None,
+            responses={200: {'model': list[D.User]}}, description='Seeded users for the login screen: the buyer first, then suppliers. No auth needed.')
 async def users(db: Db):
     rows = await db.scalars(select(User).order_by(User.role, User.id))
     return [S.user(u) for u in rows]
 
 
-@router.get('/rfqs')
+@router.get('/rfqs', tags=['RFQs'], summary='List auctions', response_model=None,
+            responses={200: {'model': D.RfqList}, **errors(401)},
+            description='Every RFQ, newest first, with its derived status, current L1 price and bid count. Suppliers also get `myRank` per RFQ.')
 async def list_rfqs(db: Db, user: Me):
     rfqs = (await db.scalars(select(Rfq).order_by(Rfq.id.desc()))).all()
     # Bids only ever go down per supplier, so the global minimum is the current L1 price.
@@ -185,7 +197,12 @@ async def list_rfqs(db: Db, user: Me):
     return {'serverNow': iso(t), 'rfqs': out}
 
 
-@router.post('/rfqs')
+@router.post('/rfqs', tags=['RFQs'], summary='Create an RFQ (buyer)', status_code=201, response_model=None,
+             responses={201: {'model': D.Rfq, 'description': 'Created'}, **errors(400, 401, 403, 409)},
+             openapi_extra={'requestBody': {'required': True, 'content': {'application/json': {'schema': D.RfqCreate.model_json_schema()}}}},
+             description='Creates a British auction. Validation: bid close after start and in the future; forced close later than bid close; '
+                         'pickup on or after the forced close date; X and Y between 1 and 1440 minutes. A duplicate `refId` returns 409 with a field issue. '
+                         'Broadcasts `rfq:updated` to the `list` room.')
 async def create_rfq(body: Body, db: Db, user: Me):
     buyer = require_role(user, 'BUYER')
     v = rfq_input(body)
@@ -218,13 +235,22 @@ async def create_rfq(body: Body, db: Db, user: Me):
     return JSONResponse(S.rfq(rfq), status_code=201)
 
 
-@router.get('/rfqs/{id}')
-async def get_rfq(id: str, db: Db, user: Me):
+@router.get('/rfqs/{id}', tags=['RFQs'], summary='Auction details (role-shaped)', response_model=None,
+            responses={200: {'model': D.RfqDetailsResponse}, **errors(401, 404)},
+            description='Buyers get the ranking (L1, L2, ...), every bid sorted by price and the full activity log. '
+                        'Suppliers get their own rank and bids, and an activity log with competitors anonymized.')
+async def get_rfq(id: RfqId, db: Db, user: Me):
     return {'serverNow': iso(now()), 'rfq': await details(db, parse_id(id), user)}
 
 
-@router.post('/rfqs/{id}/bids')
-async def place_bid(id: str, body: Body, db: Db, user: Me):
+@router.post('/rfqs/{id}/bids', tags=['Bids'], summary='Place a bid (supplier)', status_code=201, response_model=None,
+             responses={201: {'model': D.RfqDetailsResponse, 'description': "Accepted; returns the supplier's view of the auction"},
+                        **errors(400, 401, 403, 404, 409)},
+             openapi_extra={'requestBody': {'required': True, 'content': {'application/json': {'schema': D.BidCreate.model_json_schema()}}}},
+             description='Accepted only while `bidStartAt <= now < currentCloseAt`, and only if lower than the supplier\'s own previous bid. '
+                         'Runs under a row lock on the RFQ. Inside the last X minutes, if the trigger fires, the close moves Y minutes later, '
+                         'capped at the forced close; the activity log records why. Broadcasts `rfq:updated` to `rfq:<id>` and `list`.')
+async def place_bid(id: RfqId, body: Body, db: Db, user: Me):
     # Arrival time is the bid's timestamp. Close times only ever move later, so checking
     # against arrival (not lock-acquired) time never lets a late bid in.
     t = now()

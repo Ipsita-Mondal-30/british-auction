@@ -1,6 +1,6 @@
 # Backend (Python / FastAPI)
 
-REST API under `/api` and Socket.IO live updates for the British auction RFQ system. Interactive API docs are served at `/docs`.
+REST API under `/api` and Socket.IO live updates for the British auction RFQ system. API docs: Swagger UI at `/docs`, ReDoc at `/redoc`, OpenAPI 3.1 spec at `/openapi.json`.
 
 ## Run locally
 
@@ -53,6 +53,8 @@ A database created by the earlier Node/Prisma version of this API already has th
 | `app/validation.py` | Request validation and field error messages |
 | `app/auction.py` | Pure auction rules: ranking, trigger window, triggers, extension cap, status |
 | `app/serialize.py` | Rows to JSON (camelCase, ISO timestamps, money strings) |
+| `app/openapi.py` | API docs: overview text, tags, error examples; drops FastAPI's default 422 (the API uses 400) |
+| `app/schemas.py` | Documentation-only request/response models for Swagger UI (they never change what the API accepts or returns) |
 | `app/errors.py` | `{ error, issues? }` error responses |
 | `app/models.py` | SQLAlchemy models (`User`, `Rfq`, `Bid`, `AuctionEvent`) |
 | `app/db.py` | Async database engine and sessions (asyncpg) |

@@ -3,9 +3,28 @@
 A freight RFQ platform with British auction (reverse auction) bidding. Suppliers keep lowering their quotes. Activity close to the end extends the auction, and a forced close time caps it.
 
 - **Live demo:** [british-auction.vercel.app](https://british-auction.vercel.app) · API: [british-auction-api-zbjx.onrender.com](https://british-auction-api-zbjx.onrender.com/api/health)
+- **API docs (Swagger):** [/docs](https://british-auction-api-zbjx.onrender.com/docs) · [ReDoc](https://british-auction-api-zbjx.onrender.com/redoc) · [OpenAPI JSON](https://british-auction-api-zbjx.onrender.com/openapi.json)
 - **Design docs:** [High-level design](docs/HLD.md) · [Database schema](docs/SCHEMA.md) · [Backend architecture diagram prompt](docs/BACKEND_ARCHITECTURE_PROMPT.md)
 
 ![Architecture](docs/architecture.png)
+
+## High-level design at a glance
+
+The full design review is in **[docs/HLD.md](docs/HLD.md)**: requirements, capacity estimates, architecture, data model, key flows, consistency, a scalability deep dive, reliability, security, observability, the roadmap and decision records. Each capability is marked **Built** (live today) or **Planned**.
+
+| Area | Built in v1 | Planned next | HLD |
+|---|---|---|---|
+| Correctness | One Postgres row lock per auction; server clock decides; arrival-time stamping; status derived on read | Transactional outbox so no broadcast is ever lost | [§7](docs/HLD.md#7-consistency-and-timer-integrity-built), [§10](docs/HLD.md#10-reliability) |
+| Live updates | Socket.IO pushes `{ rfqId }` only; clients refetch with their own role | Redis pub/sub adapter so broadcasts reach every API instance | [§4](docs/HLD.md#4-architecture-v1-built), [§9.4](docs/HLD.md#94-scaling-out) |
+| Hot auctions (hot keys) | Lock scoped to one RFQ, millisecond transactions | Snapshot cache with request coalescing, Redis ZSET leaderboards, local cache in front of hot Redis keys, per-auction ordering at extreme load | [§9.1](docs/HLD.md#91-hot-keys-and-hot-auctions) |
+| Duplicates and retries | Own-bid rule rejects repeats that aren't lower | Idempotency keys with a Bloom filter in front of an authoritative Redis check | [§9.2](docs/HLD.md#92-bloom-filters) |
+| Background work | — | Celery on a Redis broker: `close_auction` jobs scheduled at the close (re-scheduled on extension), notifications, outbox relay, nightly success metrics | [§13](docs/HLD.md#13-roadmap-redis-celery-and-beyond) |
+| Security | Mock `x-user-id` auth; role-shaped responses in one place; CORS locked to the frontend | OIDC/JWT, per-org tenancy, Redis token-bucket rate limits | [§11](docs/HLD.md#11-security) |
+
+```mermaid
+flowchart LR
+    P1["1. Scale reads<br/>Redis cache + Socket.IO adapter"] --> P2["2. Reliable side effects<br/>Celery + outbox + close jobs"] --> P3["3. Hardening<br/>auth, rate limits, idempotency"] --> P4["4. Data at scale<br/>replica, partitions, analytics"] --> P5["5. Product<br/>awarding, multi-tenant"]
+```
 
 ## What it does
 
@@ -75,11 +94,17 @@ A supplier's bid reaches every open page over WebSockets: the ranking reorders, 
 
 ![Live update toast](docs/screenshots/08-live-update-toast.png)
 
-### 9. Interactive API docs
+### 9. API docs (Swagger UI)
 
-FastAPI generates OpenAPI docs for every endpoint, served at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs), where each request can be tried from the browser.
+OpenAPI 3.1 docs at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs): how to log in, the error format, the Socket.IO events, and every endpoint grouped by Health, Users, RFQs and Bids. Click **Authorize**, enter a user id, and use **Try it out** on any endpoint.
 
-![Interactive API docs](docs/screenshots/09-api-docs.png)
+![API docs overview](docs/screenshots/09-api-docs.png)
+
+### 10. API docs: an endpoint in detail
+
+Each endpoint lists its rules, an example request body, and every response it can return (here 201, 400, 401, 403, 404 and 409) with example bodies.
+
+![Place a bid endpoint in Swagger UI](docs/screenshots/10-api-docs-place-bid.png)
 
 ## Assignment checklist
 
@@ -173,7 +198,19 @@ The tests cover ranking and ties, the trigger window boundaries, each trigger ty
 
 ## API
 
-All routes are under `/api`. Every route except `/health` and `/users` needs an `x-user-id` header (mock auth). FastAPI also serves interactive API docs at [`/docs`](https://british-auction-api-zbjx.onrender.com/docs).
+### API docs (Swagger / OpenAPI)
+
+| | Live | Local |
+|---|---|---|
+| Swagger UI (try requests in the browser) | [british-auction-api-zbjx.onrender.com/docs](https://british-auction-api-zbjx.onrender.com/docs) | http://localhost:4000/docs |
+| ReDoc (read-only reference) | [/redoc](https://british-auction-api-zbjx.onrender.com/redoc) | http://localhost:4000/redoc |
+| OpenAPI 3.1 spec (JSON) | [/openapi.json](https://british-auction-api-zbjx.onrender.com/openapi.json) | http://localhost:4000/openapi.json |
+
+To call protected endpoints from Swagger UI: click **Authorize**, enter `1` (the buyer) or `2`–`5` (suppliers), then open an endpoint and click **Try it out** → **Execute**. The spec is generated from the code (`backend-py/app/openapi.py`, `app/schemas.py`), so it stays in step with the routes; import `/openapi.json` into Postman or Insomnia to get a ready-made collection.
+
+### Endpoints
+
+All routes are under `/api`. Every route except `/health` and `/users` needs an `x-user-id` header (mock auth).
 
 | Method | Path | Who | |
 |---|---|---|---|
