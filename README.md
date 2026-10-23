@@ -4,7 +4,7 @@ A freight RFQ platform with British auction (reverse auction) bidding. Suppliers
 
 - **Live demo:** [british-auction.vercel.app](https://british-auction.vercel.app) · API: [british-auction-api-zbjx.onrender.com](https://british-auction-api-zbjx.onrender.com/api/health)
 - **API docs (Swagger):** [/docs](https://british-auction-api-zbjx.onrender.com/docs) · [ReDoc](https://british-auction-api-zbjx.onrender.com/redoc) · [OpenAPI JSON](https://british-auction-api-zbjx.onrender.com/openapi.json)
-- **Design docs:** [High-level design](docs/HLD.md) · [Database schema](docs/SCHEMA.md) · [Backend architecture diagram prompt](docs/BACKEND_ARCHITECTURE_PROMPT.md)
+- **Design docs:** [High-level design](docs/HLD.md) · [Database schema](docs/SCHEMA.md)
 
 ![Architecture](docs/architecture.png)
 
