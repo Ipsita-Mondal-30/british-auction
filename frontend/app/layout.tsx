@@ -26,8 +26,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <Suspense>
           <LiveNotifications />
         </Suspense>
-        {/* One toaster for the whole app. Cards are custom (lib/notify.tsx). */}
-        <Toaster position="bottom-right" visibleToasts={4} gap={10} offset={24} mobileOffset={16} />
+        {/* One toaster for the whole app. Cards are custom (lib/notify.tsx). `expand` lists toasts one above
+            the other instead of a collapsed deck, so simultaneous toasts are all readable. */}
+        <Toaster position="bottom-right" expand visibleToasts={4} gap={10} offset={24} mobileOffset={16} />
       </body>
     </html>
   );

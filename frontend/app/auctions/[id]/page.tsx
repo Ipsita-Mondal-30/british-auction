@@ -163,7 +163,10 @@ function Auction() {
   );
 }
 
-/** Toasts for new activity on the auction being viewed. Ids are per auction, so bursts update in place. */
+/**
+ * Toasts for new activity on the auction being viewed. Ids are per auction and per kind: a burst of the
+ * same kind updates one toast in place, while different kinds (bid, extension, forced cap) stack.
+ */
 function announce(rfq: RfqDetails, fresh: AuctionEvent[], prevRank: number | null | undefined) {
   if (!fresh.length) return;
   const isBuyer = rfq.ranking !== undefined;
@@ -205,7 +208,7 @@ function announce(rfq: RfqDetails, fresh: AuctionEvent[], prevRank: number | nul
   if (capped)
     notify({
       kind: 'capped',
-      id: `ext-${rfq.id}`,
+      id: `cap-${rfq.id}`,
       title: 'Forced close reached',
       description: `No more extensions. Bidding ends at ${fmtTime(rfq.forcedCloseAt)}.`,
     });
